@@ -1,0 +1,377 @@
+Station;Date;Comment;Earthquake;HW/SW_Change;Unknown;Use
+ABEC;2016-04-16;ecuador eq;1;0;0;1
+ALEC;2016-04-16;ecuador eq;1;0;0;1
+ALUM;2010-02-27;Chile EQ;1;0;0;1
+ALUM;2010-02-27;chile eq 2015;1;0;0;1
+ANTC;2010-02-27;Chile EQ;1;0;0;1
+AREQ;2000-01-02;Arequipa earthquake (7,2);1;0;0;1
+AREQ;2001-06-23;EQ;1;0;0;1
+AREQ;2002-08-27;Cable change;0;1;0;1
+AREQ;2007-12-02;-;0;0;1;1
+AREQ;2014-04-01;northern chile 2014 eq#1;1;0;0;1
+AREQ;2014-04-12;northern chile 2014 eq#2;1;0;0;1
+AUTF;2006-03-30;disc;0;1;0;1
+AUTF;2017-03-23;disc;0;1;0;1
+AUTF;2017-09-15;disc;0;1;0;1
+AZUL;2010-02-27;Chile EQ;1;0;0;1
+BCAR;2010-02-27;Chile EQ;1;0;0;1
+BDOS;2005-06-05;Martinique earthquake (7,4);1;0;0;1
+BDOS;2007-11-29;EQ;1;0;0;1
+BDOS;2007-12-02;-;0;0;1;1
+BEPA;2018-07-13;disc;0;1;0;0
+BHEC;2016-04-16;ecuador eq;1;0;0;1
+BNGA;2010-03-11;disc;0;1;0;0
+BNGA;2012-05-10;disc;0;1;0;0
+BOGA;2014-04-07;disc;0;1;0;0
+BOGA;2018-07-17;disc;0;1;0;0
+BOGT;2002-05-23;Antenna swap;0;1;0;0
+BOGT;2005-07-17;-;0;0;1;0
+BRAZ;2000-01-02;Antenna & receiver change;0;1;0;1
+BRAZ;2007-03-13;disc;0;1;0;1
+BRAZ;2007-03-18;-;0;0;1;1
+BRAZ;2012-09-18;disc;0;1;0;1
+BRAZ;2012-11-27;disc;0;1;0;1
+BRAZ;2013-04-25;disc;0;1;0;1
+BRAZ;2014-09-17;disc;0;1;0;1
+BRAZ;2014-10-23;disc;0;1;0;1
+BRAZ;2014-12-23;disc;0;1;0;1
+BRAZ;2015-01-21;disc;0;1;0;1
+BRAZ;2015-02-26;disc;0;1;0;1
+BRAZ;2015-04-15;disc;0;1;0;1
+BRAZ;2016-02-03;disc;0;1;0;1
+BRAZ;2016-09-28;disc;0;1;0;1
+BRMU;2000-01-02;Antenna & receiver change;0;1;0;1
+BRMU;2003-03-12;Jump;0;0;1;1
+BRMU;2009-04-13;-;0;0;1;1
+BRMU;2011-09-28;Antenna change;0;1;0;1
+CATA;2010-02-27;Chile EQ;1;0;0;1
+CATA;2015-09-16;chile eq 2015;1;0;0;1
+CBMB;2014-04-01;northern chile 2014 eq#1;1;0;0;1
+CBMB;2014-04-12;northern chile 2014 eq#2;1;0;0;1
+CBSB;2005-11-19;Jump;0;0;1;1
+CBSB;2008-11-27;-;0;0;1;1
+CEEU;2008-03-03;disc;0;1;0;1
+CEEU;2009-10-16;disc;0;1;0;1
+CEEU;2012-08-30;disc;0;1;0;1
+CEEU;2014-10-29;disc;0;1;0;1
+CEFT;2008-08-13;disc;0;1;0;1
+CEFT;2012-09-18;disc;0;1;0;1
+CEFT;2013-03-21;disc;0;1;0;1
+CEFT;2013-06-15;disc;0;1;0;1
+CEFT;2013-09-17;disc;0;1;0;1
+CEFT;2014-10-30;disc;0;1;0;1
+CEFT;2016-04-27;disc;0;1;0;1
+CEFT;2018-03-21;disc;0;1;0;1
+CFAG;2010-02-27;Chile EQ;1;0;0;1
+CHEC;2016-04-16;ecuador eq;1;0;0;1
+CHET;2003-01-17;disc;0;1;0;1
+CHET;2016-05-12;disc;0;1;0;1
+CIQE;2017-11-13;costa rica eq;1;0;0;1
+COAT;2012-11-07;costa rica eq 2011#1;1;0;0;1
+COAT;2012-11-11;costa rica eq 2011#2;1;0;0;1
+COEC;2016-04-16;ecuador eq;1;0;0;1
+COL2;2001-04-27;disc;0;1;0;1
+COL2;2003-01-18;disc;0;1;0;1
+COL2;2016-05-12;disc;0;1;0;1
+CONZ;2002-06-10;Antenna & receiver change;0;1;0;1
+CONZ;2005-05-18;-;0;0;1;1
+CONZ;2010-02-27;Chile EQ;1;0;0;1
+CONZ;2011-02-12;;1;0;0;1
+COPO;2002-07-01;Copiapo earthquake (5,3);1;0;0;1
+COPO;2006-04-30;EQ;1;0;0;1
+COPO;2006-05-03;Antenna & receiver change;0;1;0;1
+COPO;2008-07-05;-;0;0;1;1
+COPO;2010-02-27;Chile EQ;1;0;0;1
+CORD;2000-01-02;Receiver change;0;1;0;1
+CORD;2005-03-03;-;0;0;1;1
+CORD;2015-09-16;chile eq 2015;1;0;0;1
+COTZ;2012-11-07;costa rica eq 2011#2;1;0;0;1
+COTZ;2012-11-11;costa rica eq 2011#2;1;0;0;1
+COYQ;2000-01-02;Jump;0;0;1;1
+COYQ;2007-12-06;-;0;0;1;1
+CRAT;2001-08-20;Jump;0;0;1;1
+CRAT;2005-08-16;Jump;0;0;1;1
+CRAT;2008-03-07;-;0;0;1;1
+CRCS;2010-02-27;eq;1;0;0;1
+CRLP;2017-11-13;costa rica eq;1;0;0;1
+CRO1;2000-01-02;;0;0;1;1
+CRO1;2005-08-04;;0;0;1;1
+CSLO;2010-02-27;Chile EQ;1;0;0;1
+CSLO;2015-09-16;chile eq 2015;1;0;0;1
+CUEC;2016-04-16;ecuador eq;1;0;0;1
+CUIB;2000-01-21;Antenna & receiver change;0;1;0;1
+CUIB;2007-04-10;-;0;0;1;1
+CXEC;2016-04-16;ecuador eq;1;0;0;1
+DORA;2006-02-16;disc;0;1;0;1
+DORA;2012-05-05;disc;0;1;0;1
+EBYP;2010-02-27;Chile EQ;1;0;0;1
+ECEC;2016-04-16;ecuador eq;1;0;0;1
+EMIB;2014-04-01;northern chile 2014 eq#1;1;0;0;1
+EMIB;2014-04-12;northern chile 2014 eq#2;1;0;0;1
+EPEC;2016-04-16;ecuador eq;1;0;0;1
+EREC;2016-04-16;ecuador eq;1;0;0;1
+ESMR;2016-04-16;ecuador eq;1;0;0;1
+ESQU;2008-09-04;disc;0;1;0;1
+ESQU;2013-01-07;disc;0;1;0;1
+ESQU;2016-10-03;disc;0;1;0;1
+ETCG;2003-02-11;Costa Rica earthquake (6,1);1;0;0;1
+ETCG;2008-01-08;EQ;1;0;0;1
+ETCG;2009-01-11;-;0;0;1;1
+ETCG;2012-09-05;Nicoya earthquake (Mw = 7.6);1;0;0;1
+FOEC;2016-04-16;ecuador eq;1;0;0;1
+FQNE;2012-05-01;disc;0;1;0;1
+GLPS;2003-01-07;Receiver change;0;1;0;1
+GLPS;2008-10-11;-;0;0;1;1
+GOLD;2011-09-19;disc;0;1;0;1
+GOLD;2019-04-26;disc;0;1;0;1
+GTK0;2007-11-29;EQ;1;0;0;1
+GUAT;2000-07-28;disc;0;1;0;1
+GUAT;2008-09-18;disc;0;1;0;1
+GUAT;2011-11-28;disc;0;1;0;1
+IACR;2009-01-06;disc;0;1;0;1
+IACR;2011-09-11;disc;0;1;0;1
+IACR;2014-04-01;northern chile 2014 eq#1;1;0;0;1
+IACR;2014-04-12;northern chile 2014 eq#2;1;0;0;1
+IACR;2018-07-29;disc;0;1;0;1
+IBEC;2016-04-16;ecuador eq;1;0;0;1
+IDGO;2009-01-28;disc;0;1;0;1
+IDGO;2012-09-01;disc;0;1;0;1
+IDGO;2012-10-04;disc;0;1;0;1
+IDGO;2013-10-04;disc;0;1;0;1
+IDGO;2016-05-18;disc;0;1;0;1
+IGM1;2010-02-27;Chile EQ;1;0;0;1
+IND1;2012-09-05;Nicoya earthquake (Mw = 7.6);1;0;0;1
+INEG;2000-05-05;Antenna swap;0;1;0;1
+INEG;2001-05-06;Jump;0;0;1;1
+INEG;2004-11-15;-;0;0;1;1
+IQQE;2005-06-13;EQ;1;0;0;1
+IQQE;2014-04-01;northern chile 2014 eq#1;1;0;0;1
+IQQE;2014-04-12;northern chile 2014 eq#2;1;0;0;1
+JAMA;2002-05-25;disc;0;1;0;1
+JAMA;2006-06-16;disc;0;1;0;1
+JBAL;2015-09-16;chile eq 2015;1;0;0;1
+JBAL;2018-07-19;disc;0;1;0;1
+KOUR;2000-01-02;Antenna change;0;1;0;1
+KOUR;2002-02-06;Jump;0;0;1;1
+KOUR;2006-07-02;-;0;0;1;1
+KOUR;2012-11-06;Antenna change;0;1;0;1
+LHCL;2010-02-27;Chile EQ;1;0;0;1
+LIBE;2012-09-05;Nicoya earthquake (Mw = 7.6);1;0;0;1
+LIMN;2012-09-05;Nicoya earthquake (Mw = 7.6);1;0;0;1
+LPGS;2010-02-27;Chile EQ;1;0;0;1
+LVEG;2013-02-03;Antenna change;0;1;0;1
+MA01;2010-02-27;Chile EQ;1;0;0;1
+MAEC;2016-04-16;ecuador eq;1;0;0;1
+MANA;2000-05-14;Managua earthquake (6,9);1;0;0;1
+MANA;2004-10-09;EQ;1;0;0;1
+MANA;2004-10-11;-;0;0;1;1
+MARA;2000-01-21;Antenna change;0;1;0;1
+MARA;2008-07-16;;0;0;1;1
+MAS1;2012-06-23;Antenna change;0;1;0;1
+MD01;2014-04-01;northern chile 2014 eq#1;1;0;0;1
+MD01;2014-04-12;northern chile 2014 eq#2;1;0;0;1
+MDO1;2000-01-02;Receiver change;0;1;0;1
+MDO1;2004-12-08;-;0;0;1;1
+MEDE;2005-07-24;disc;0;1;0;1
+MEDE;2007-10-01;disc;0;1;0;1
+MEDE;2010-03-01;disc;0;1;0;1
+MEDE;2012-10-26;disc;0;1;0;1
+MEXI;2010-04-04;eq;1;0;0;1
+MGBH;2008-09-17;disc;0;1;0;1
+MGBH;2018-03-20;disc;0;1;0;1
+MSCG;2018-04-24;disc;0;1;0;1
+MZAC;2004-06-10;disc;0;1;0;1
+MZAC;2009-11-30;disc;0;1;0;1
+MZAC;2009-12-10;disc;0;1;0;1
+MZAC;2010-02-27;Chile EQ;1;0;0;1
+MZAC;2011-12-19;disc;0;1;0;1
+MZAC;2012-02-04;disc;0;1;0;1
+MZAC;2015-09-16;chile eq 2015;1;0;0;1
+MZAC;2016-03-16;disc;0;1;0;1
+MZAC;2016-11-15;disc;0;1;0;1
+MZAC;2017-08-07;disc;0;1;0;1
+MZAE;2010-02-27;Chile EQ;1;0;0;1
+MZAE;2010-02-27;Chile EQ;1;0;0;1
+MZAE;2012-12-05;disc;0;1;0;1
+MZAE;2015-09-16;chile eq 2015;1;0;0;1
+MZAL;2015-09-16;chile eq 2015;1;0;0;1
+MZAL;2018-04-18;disc;0;1;0;1
+MZAS;2010-02-27;Chile EQ;1;0;0;1
+MZAU;2010-02-27;chile eq 2015;1;0;0;1
+MZGA;2010-02-27;chile eq 2015;1;0;0;1
+MZRF;2015-09-16;chile eq 2015;1;0;0;1
+MZSR;2015-09-16;chile eq 2015;1;0;0;1
+NAS0;2007-06-25;disc;0;1;0;1
+NAS0;2009-03-20;disc;0;1;0;1
+NAS0;2011-11-15;disc;0;1;0;1
+NAS0;2017-03-26;disc;0;1;0;1
+NAUS;2013-04-09;disc;0;1;0;1
+NAUS;2014-05-24;disc;0;1;0;1
+NAUS;2014-08-28;disc;0;1;0;1
+NAUS;2014-11-19;disc;0;1;0;1
+NAUS;2015-03-25;disc;0;1;0;1
+NAUS;2016-11-25;disc;0;1;0;1
+NEIA;2006-01-05;Antenna & receiver change;0;1;0;1
+NEIA;2009-09-11;disc;0;1;0;1
+NEIA;2009-11-17;disc;0;1;0;1
+NEIA;2010-01-02;-;0;0;1;1
+NEIA;2012-08-29;disc;0;1;0;1
+NEIA;2016-10-19;disc;0;1;0;1
+NEIL;2018-10-16;disc;0;1;0;1
+NEVA;2018-03-15;disc;0;1;0;1
+NICY;2012-09-05;Nicoya earthquake (Mw = 7.6);1;0;0;1
+NJEC;2016-04-16;ecuador eq;1;0;0;1
+NYCO;2018-10-22;disc;0;1;0;1
+OAX2;2002-12-20;disc;0;1;0;1
+OAX2;2003-01-13;disc;0;1;0;1
+OAX2;2009-07-17;disc;0;1;0;0
+OAX2;2015-12-15;disc;0;1;0;0
+OAX2;2016-05-30;disc;0;1;0;0
+ONEC;2016-04-16;ecuador eq;1;0;0;1
+ONRJ;2007-04-01;Antenna & receiver change;0;1;0;1
+ONRJ;2009-10-11;-;0;0;1;1
+PAIT;2010-12-01;disc;0;1;0;1
+PAIT;2014-03-27;disc;0;1;0;1
+PAIT;2014-06-05;disc;0;1;0;1
+PAIT;2014-10-30;disc;0;1;0;1
+PARC;2000-01-02;Antenna swap;0;1;0;1
+PARC;2001-12-12;-;0;0;1;1
+PIE1;2000-01-02;Antenna change;0;1;0;1
+PIE1;2007-01-24;-;0;0;1;1
+PJEC;2016-04-16;ecuador eq;1;0;0;1
+PMB1;2005-12-30;Antenna & receiver change;0;1;0;1
+PMB1;2007-12-19;-;0;0;1;1
+POPA;2018-03-09;disc;0;1;0;1
+PREC;2016-04-16;ecuador eq;1;0;0;1
+PRNA;2011-07-01;disc;0;1;0;1
+PRNA;2011-07-01;chile eq 2015;1;0;0;1
+PRNA;2018-08-07;disc;0;1;0;1
+PSTO;2016-04-16;ecuador eq;1;0;0;1
+PSTO;2018-09-20;disc;0;1;0;1
+PUNT;2012-09-05;Nicoya earthquake (Mw = 7.6);1;0;0;1
+PUNT;2017-11-13;costa rica eq;1;0;0;1
+QSEC;2012-09-05;Nicoya earthquake (Mw = 7.6);1;0;0;1
+QUEM;2016-04-16;ecuador eq;1;0;0;1
+QUI3;2016-04-16;ecuador eq;1;0;0;1
+QVEC;2016-04-16;ecuador eq;1;0;0;1
+RIDC;2012-09-05;Nicoya earthquake (Mw = 7.6);1;0;0;1
+RIDC;2017-11-13;costa rica eq;1;0;0;1
+RIDC;2018-10-11;disc;0;1;0;1
+RIOB;2013-04-04;Antenna change;0;1;0;1
+RIOD;2001-07-21;disc;0;1;0;1
+RIOD;2006-02-24;disc;0;1;0;1
+RIOD;2006-08-01;disc;0;1;0;1
+RIOD;2007-03-19;disc;0;1;0;1
+RIOD;2008-03-06;disc;0;1;0;1
+RIOD;2013-08-08;disc;0;1;0;1
+RIOD;2018-03-12;disc;0;1;0;1
+RIOP;2000-01-02;Antenna & receiver change;0;1;0;1
+RIOP;2007-04-29;-;0;0;1;1
+RIOP;2016-04-16;ecuador eq;1;0;0;1
+RNMO;2017-03-28;disc;0;1;0;1
+RNNA;2013-04-15;Antenna change;0;1;0;1
+RWSN;2010-02-27;Chile EQ;1;0;0;1
+RWSN;2011-03-15;disc;0;1;0;1
+RWSN;2011-10-06;disc;0;1;0;1
+RWSN;2014-07-30;disc;0;1;0;1
+SALU;2013-06-11;Antenna change;0;1;0;1
+SANT;2010-02-27;Chile EQ;1;0;0;1
+SANT;2010-02-27;chile eq 2015;1;0;0;1
+SANT;2016-12-02;disc;0;1;0;0
+SANT;2017-01-06;disc;0;1;0;1
+SANT;2018-04-20;disc;0;1;0;0
+SCAQ;2013-10-08;disc;0;1;0;1
+SCAQ;2014-05-26;disc;0;1;0;1
+SCAQ;2014-10-25;disc;0;1;0;1
+SCEC;2013-12-01;disc;0;1;0;1
+SCEC;2014-10-15;disc;0;1;0;1
+SCRZ;2012-11-17;disc;0;1;0;1
+SCRZ;2014-04-01;northern chile 2014 eq#1;1;0;0;1
+SCRZ;2014-04-12;northern chile 2014 eq#2;1;0;0;1
+SEEC;2016-04-16;ecuador eq;1;0;0;1
+SL01;2010-02-27;eq;1;0;0;1
+SL01;2015-09-16;chile eq 2015;1;0;0;1
+SMAR;2010-02-27;Chile EQ;1;0;0;1
+SNLR;2009-11-19;disc;0;1;0;1
+SNLR;2016-07-08;disc;0;1;0;1
+SRLP;2010-02-27;Chile EQ;1;0;0;1
+SRZN;2015-12-09;disc;0;1;0;1
+SRZN;2016-03-21;disc;0;1;0;1
+SRZN;2018-09-01;disc;0;1;0;1
+SSIA;2001-02-13;Jump;0;0;1;1
+SSIA;2001-02-13;EQ;1;0;0;1
+SSIA;2005-06-16;-;0;0;1;1
+TNEC;2016-04-16;ecuador eq;1;0;0;1
+TOL2;2016-05-17;disc;0;1;0;1
+TUCU;2002-01-01;Change of trend in vertical velocity;0;0;1;1
+TUCU;2006-08-31;-;0;0;1;1
+TUNA;2005-10-18;disc;0;1;0;1
+TUNA;2008-05-06;disc;0;1;0;1
+TUNA;2012-10-23;disc;0;1;0;1
+UBA1;2012-02-14;disc;0;1;0;1
+UBA1;2012-08-09;disc;0;1;0;1
+UBA1;2014-11-27;disc;0;1;0;1
+UBAT;2006-01-02;Jump;0;0;1;1
+UBAT;2008-04-14;-;0;0;1;1
+UCOR;2004-04-05;Antenna & receiver change;0;1;0;1
+UCOR;2005-10-11;disc;0;1;0;1
+UCOR;2005-11-19;disc;0;1;0;1
+UCOR;2005-12-29;disc;0;1;0;1
+UCOR;2006-04-11;disc;0;1;0;1
+UCOR;2008-11-23;-;0;0;1;1
+UCOR;2008-12-19;disc;0;1;0;1
+UCOR;2010-02-27;eq;1;0;0;1
+UCOR;2015-09-16;chile eq 2015;1;0;0;1
+UCOR;2017-08-23;disc;0;1;0;1
+UCOR;2019-05-31;disc;0;1;0;1
+UCRI;2017-11-13;costa rica eq;1;0;0;1
+UGTO;2007-05-31;disc;0;1;0;1
+UGTO;2016-05-23;disc;0;1;0;1
+UNRO;2010-02-27;Chile EQ;1;0;0;1
+UNRO;2015-09-16;chile eq 2015;1;0;0;1
+UNSA;2000-01-02;Antenna swap;0;1;0;1
+UNSA;2001-07-11;disc;0;1;0;1
+UNSA;2004-06-09;disc;0;1;0;1
+UNSA;2008-07-24;disc;0;1;0;1
+UNSA;2008-07-28;-;0;0;1;1
+UNSA;2009-04-28;disc;0;1;0;1
+UNSA;2010-02-27;Chile EQ;1;0;0;1
+UNSA;2015-04-29;disc;0;1;0;1
+UNSJ;2010-02-27;Chile EQ;1;0;0;1
+UNSJ;2015-09-16;chile eq 2015;1;0;0;1
+URUS;2014-04-01;northern chile 2014 eq#1;1;0;0;1
+URUS;2014-04-12;northern chile 2014 eq#2;1;0;0;1
+USLP;2008-06-22;disc;0;1;0;1
+USLP;2010-08-23;disc;0;1;0;1
+USLP;2010-10-08;disc;0;1;0;1
+USLP;2011-11-23;disc;0;1;0;1
+USLP;2012-04-23;disc;0;1;0;1
+UYMO;2007-11-01;Antenna change;0;1;0;1
+UYMO;2009-03-08;-;0;0;1;1
+UYMO;2010-02-27;Chile EQ;1;0;0;1
+UYNI;2014-04-01;northern chile 2014 eq#1;1;0;0;1
+UYNI;2014-04-12;northern chile 2014 eq#2;1;0;0;1
+UYPA;2010-05-31;disc;0;1;0;1
+UYPA;2011-12-28;disc;0;1;0;1
+UYPA;2013-09-18;disc;0;1;0;1
+UYRO;2010-02-27;Chile EQ;1;0;0;1
+UYTA;2010-02-27;Chile EQ;1;0;0;1
+VALP;2010-02-27;Chile EQ;1;0;0;1
+VBCA;2010-02-27;Chile EQ;1;0;0;1
+VERA;2012-09-05;Nicoya earthquake (Mw = 7.6);1;0;0;1
+VICO;2007-04-04;disc;0;1;0;1
+VICO;2011-09-20;disc;0;1;0;1
+VICO;2012-04-04;disc;0;1;0;1
+VIL2;2000-03-01;disc;0;1;0;1
+VIL2;2000-09-02;disc;0;1;0;1
+VIL2;2000-09-07;disc;0;1;0;1
+VIL2;2001-09-27;disc;0;1;0;1
+VIL2;2001-10-15;disc;0;1;0;1
+VIL2;2002-06-19;disc;0;1;0;1
+VIL2;2003-01-20;disc;0;1;0;1
+VIVI;2005-09-18;Jump;0;0;1;1
+VIVI;2005-09-18;Jump;0;0;1;1
+VIVI;2008-01-24;-;0;0;1;1
+VIVI;2008-01-24;-;0;0;1;1
+YCBA;2014-04-01;northern chile 2014 eq#1;1;0;0;1
+YCBA;2014-04-12;northern chile 2014 eq#2;1;0;0;1
