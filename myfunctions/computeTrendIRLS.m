@@ -1,4 +1,4 @@
-function [y, wrmse, xEst, outlierLogical] = computeTrendIRLS(x, b, nPolyn, w, jt, eqjt, T, KK, p, outl_factor)
+function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, nPolyn, w, jt, eqjt, T, KK, p, outl_factor)
 % LSE
 % INPUT
 % x: vector containing time stamps (years since t0)
@@ -153,9 +153,14 @@ for k = 1:KK
 %     plot(k, rmse,'mx')
 end
 
-% compute WEIGHTED RMS and RMS error
+% compute WEIGHTED RMS and RMS error -> store in result cell
 wrmse = sqrt(1/nData * sum(w_i .* (b - A * xEst).^2));
 rmse = sqrt(1/nData * sum((b - A * xEst).^2));
+
+results{1, 1} = 'rms';
+results{1, 2} = rmse;
+results{2, 1} = 'wrms';
+results{2, 2} = wrmse;
 
 fprintf('WMRS = %.4f, RMS = %.4f\n', wrmse, rmse);
 

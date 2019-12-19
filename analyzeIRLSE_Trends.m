@@ -23,13 +23,13 @@ stationname = 'RWSN'; %
 
 % result files to be analysed
 % get files according to their filename in the specified directory
-[Results, Results_names] = findStationData(stationname, resultsLocation);
+[Results, Result_params, Results_names] = findStationData(stationname, resultsLocation);
 
 % other variables (constants)
 coordinateSTR = {'E', 'N', 'U'}; % used to label plots
 titleString = ['Comparison of IRLSE Results for "', stationname, '"'];
 
-%% Add ITRF Realization Change Jumps
+%% Add ITRF Realization Change Jumps (for plots)
 % format yyyy-MM-dd,
 jumpITRF(1) = datetime('2011-04-17', 'InputFormat', 'yyyy-MM-dd', 'TimeZone', 'UTC');
 jumpITRF(2) = datetime('2017-01-29', 'InputFormat', 'yyyy-MM-dd', 'TimeZone', 'UTC');
@@ -124,22 +124,30 @@ for i = 1:3
     set(gcf, 'InnerPosition', [1000 1000 1500 600]); % large figure
 end
 
-function [Result_array, Result_names] = findStationData(stationname, location)
+function [Result_array, Result_params, Result_names] = findStationData(stationname, location)
 % get file list
 fList = dir([location, '/', stationname, '*.csv']);
 % fList([1 5 6 7]) = [] % REMOVE FILES FROM ANALYSIS MANUALLY
 fprintf('Files:\n%s', sprintf('%s\n', fList.name));
 n_files = length(fList);
 % get data from result files (result files (datetime unix, E, N, U)
-Result_array = cell(n_files, 4); % preallocating
-Result_names = cell(n_files, 1); % preallocating
+% preallocating
+Result_array = cell(n_files, 4);
+Result_names = cell(n_files, 1);
+Result_params = cell(n_files, 1); 
 
 for i = 1:n_files
     readInData = csvread(fullfile(fList(i).folder, fList(i).name));
-    Result_array{i, 1} = datetime(readInData(:, 1), 'ConvertFrom', 'posixtime', 'TimeZone', 'UTC');
-    Result_array{i, 2} = readInData(:, 2); % E
-    Result_array{i, 3} = readInData(:, 3); % N
-    Result_array{i, 4} = readInData(:, 4); % U
+    
+    Result_params{i} = readInData(1:2, :); % first 2 rows
+    
+    % remaining rows -> data
+    Result_array{i, 1} = datetime(readInData(3:end, 1), 'ConvertFrom', 'posixtime', 'TimeZone', 'UTC');
+    Result_array{i, 2} = readInData(3:end, 2); % E
+    Result_array{i, 3} = readInData(3:end, 3); % N
+    Result_array{i, 4} = readInData(3:end, 4); % U
+    
+    
     % filename
     Result_names{i} = fList(i).name;
 end

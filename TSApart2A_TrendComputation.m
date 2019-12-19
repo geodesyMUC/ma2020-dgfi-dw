@@ -65,16 +65,13 @@ T = 1;
 doITRFjump = true; % E - N - U
 
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
-KK = 0; % n of iterations for IRLS
-p = 2.0; % L_p Norm for IRLS
+KK = 10; % n of iterations for IRLS
+p = 1.5; % L_p Norm for IRLS
 outl_factor = 3; % median(error) + standard deviation * factor -> outlier
 
 %%% Output %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 logFileFolder = 'TSA_TrendComputationResults'; % output: log file directory
 logFile = [stationname, '_TrendComputation_log.txt']; % output: log file name
-resultSaveFile = fullfile(logFileFolder, [stationname, ...
-    sprintf('_%03d_%.1f_%d', KK, p, outl_factor), ...
-    '.csv']); % output: file name of computed trends (csv)
 
 %% CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if ~exist(logFileFolder, 'dir')
@@ -172,7 +169,7 @@ end
 
 %% Prepare Trend Estimation
 % preallocate arrays ---
-RSME = zeros(3, 1);
+result_parameters = cell(3, 2);
 OUTLIERLOGICAL = cell(3, 1);
 % create array with equal date intervals (1d)
 % % dateIntvl =  data{:, 'date'}; % verify integrity of algorithm COMMENT
@@ -226,7 +223,7 @@ fprintf(fID, '-- Logarithmic Transients for Earthquakes estimated --\n\n');
 
 for i = 1:3
     fprintf('Evaluating "%s" ...\n', coordinateSTR{i});
-    [y, rsme, xEst, outlierLogical] = computeTrendIRLS(...
+    [y, result_parameterC, xEst, outlierLogical] = computeTrendIRLS(...
         t, ... % t in years where t0 = beginning of TS
         data{:, i + 2}, ... % vector with TS metric (Coordinate measurement)
         polynDeg, ...  % polynome degree
@@ -240,7 +237,8 @@ for i = 1:3
     
     % store results in master arrays for further evaluation
     trenddata(:, i) = y;
-    RSME(i) = rsme;
+    result_parameters{i, 1} = coordinateSTR{i};
+    result_parameters{i, 2} = result_parameterC; % assign parameter cell to super cell
     OUTLIERLOGICAL{i} = outlierLogical; % 1: suspected outlier measurements, computed in IRLS function
     
     % print stuff
@@ -273,12 +271,22 @@ for i = 1:3
     fprintf(fID, ['Estimated Parameters for %s:\nPolynomial Coefficients:\n%s\n', ...
         'Oscillation Amplitudes:\n%s\nHeaviside Jumps:\n%s\nLogarithmic Transients:\n%s\nRoot Mean Square Error RSME = %.3fmm\n\n'], ...
         coordinateSTR{i}, ...
-        strP, strW, strH, strEQ, rsme);
+        strP, strW, strH, strEQ, result_parameterC{1, 2});
 end
 fprintf('Calculation finished.\nPlotting and writing results ...\n')
+
 %% Write Trend Results to file
-%writematrix([trenddata], resultSaveFile, 'Delimiter', 'comma') % R2019a
-csvwrite(resultSaveFile, [posixtime(dateIntvl'),  trenddata]); % R2006
+resultSaveFile = fullfile(logFileFolder, [stationname, ...
+    sprintf('_KK%03d_p%.1f_outl%d', KK, p, outl_factor), ...
+    '.csv']); % output: file name of computed trends (csv)
+
+
+resultM = [posixtime(dateIntvl'),  trenddata];
+resultM = [[result_parameterC{1, 2}, result_parameterC{2, 2}, NaN, NaN]; resultM]; % rmse, wrmse
+resultM = [[KK, p, outl_factor, NaN]; resultM];
+
+%writematrix(resultM, resultSaveFile, 'Delimiter', 'comma') % R2019a
+csvwrite(resultSaveFile, resultM); % R2006
 
 %% visualize Results INCLUDING EQs
 % set up title
@@ -293,9 +301,10 @@ for i = 1:3 % for E N U respectively
     end
     % set up plot title
     titleString{i} = sprintf(titleStringPattern, ...
-        stationname, size(data{:, 'date'}, 1), ITRFstring, RSME(i));
+        stationname, size(data{:, 'date'}, 1), ITRFstring, result_parameterC{1, 2});
 end
 
+% Plot Time Series & Trends
 figure
 VisualizeTS_Trend_Outliers_ITRF_ENU(data{:, 'date'}, ...
     [data{:, 'E'}, data{:, 'N'}, data{:, 'U'}], ...
