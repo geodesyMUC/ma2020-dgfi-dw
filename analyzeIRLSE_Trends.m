@@ -1,7 +1,7 @@
 clear variables; close all;
 
-%
-%
+% Visualizes different trends of the same station overlying their original timeline
+% Input is the result csv file computed by TSApart2A_TrendComputation
 %
 
 addpath('myfunctions')
@@ -26,8 +26,8 @@ stationname = 'RWSN'; %
 [Results, Result_params, Results_names] = findStationData(stationname, resultsLocation);
 
 % other variables (constants)
-coordinateSTR = {'E', 'N', 'U'}; % used to label plots
-titleString = ['Comparison of IRLSE Results for "', stationname, '"'];
+coordinateSTR = {'East', 'North', 'Up'}; % used to label plots
+titleString = ['Comparison of LSE Results for "', stationname, '"'];
 
 %% Add ITRF Realization Change Jumps (for plots)
 % format yyyy-MM-dd,
