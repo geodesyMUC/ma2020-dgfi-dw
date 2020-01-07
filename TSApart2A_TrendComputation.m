@@ -62,11 +62,11 @@ P(2) = 1/2;
 T = 1;
 
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
-doITRFjump = true; % E - N - U
+doITRFjump = false; % E - N - U
 
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
 KK = 10; % n of iterations for IRLS
-p = 1.5; % L_p Norm for IRLS
+p = 2.5; % L_p Norm for IRLS
 outl_factor = 3; % median(error) + standard deviation * factor -> outlier
 
 %%% Output %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -276,19 +276,22 @@ end
 fprintf('Calculation finished.\nPlotting and writing results ...\n')
 
 %% Write Trend Results to file
+% use parameters in file name
 resultSaveFile = fullfile(logFileFolder, [stationname, ...
-    sprintf('_KK%03d_p%.1f_outl%d', KK, p, outl_factor), ...
+    sprintf('_itrf%d_KK%03d_p%.1f_outl%d', doITRFjump,KK, p, outl_factor), ...
     '.csv']); % output: file name of computed trends (csv)
 
+% Set up matrix with results and LSE parameters
+resultM = [posixtime(dateIntvl'),  trenddata]; 
+resultM = [[result_parameterC{1, 2}, result_parameterC{2, 2}, NaN, NaN]; resultM]; % rmse, wrmse (second line)
+% needs 3 columns -> fill up with NaN
+resultM = [[doITRFjump, KK, p, outl_factor]; resultM]; % LSE parameters (first line)
 
-resultM = [posixtime(dateIntvl'),  trenddata];
-resultM = [[result_parameterC{1, 2}, result_parameterC{2, 2}, NaN, NaN]; resultM]; % rmse, wrmse
-resultM = [[KK, p, outl_factor, NaN]; resultM];
-
+% write matrix to csv file
 %writematrix(resultM, resultSaveFile, 'Delimiter', 'comma') % R2019a
 csvwrite(resultSaveFile, resultM); % R2006
 
-%% visualize Results INCLUDING EQs
+%% Visualize Results
 % set up title
 titleString = cell(3, 1);
 titleStringPattern = 'Station: %s - n of Obs.=%d - ITRF Jumps: %s - RSME = %.2fmm';

@@ -55,7 +55,7 @@ dataJump = importfileJumpCSV(jumpCSVLocation);
 
 % Get jumps for this station
 TFJump = strcmp(dataJump{:, 'Station'}, stationname); % selection logical
-fprintf('%d jumps for this station found.\n', nnz(TFJump));
+fprintf('%d jumps for this station found. (excluding ITRF changes)\n', nnz(TFJump));
 
 % All Jumps for current station
 currStationJumps = dataJump(TFJump, :);
