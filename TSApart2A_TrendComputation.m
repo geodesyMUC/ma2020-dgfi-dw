@@ -62,12 +62,12 @@ P(2) = 1/2;
 T = 1;
 
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
-doITRFjump = false; % E - N - U
+doITRFjump = true; % E - N - U
 
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
-KK = 10; % n of iterations for IRLS
-p = 2.5; % L_p Norm for IRLS
-outl_factor = 3; % median(error) + standard deviation * factor -> outlier
+KK = 0; % n of iterations for IRLS
+p = 2; % L_p Norm for IRLS
+outl_factor = 4; % median(error) + standard deviation * factor -> outlier
 
 %%% Output %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 logFileFolder = 'TSA_TrendComputationResults'; % output: log file directory
@@ -278,13 +278,15 @@ fprintf('Calculation finished.\nPlotting and writing results ...\n')
 %% Write Trend Results to file
 % use parameters in file name
 resultSaveFile = fullfile(logFileFolder, [stationname, ...
-    sprintf('_itrf%d_KK%03d_p%.1f_outl%d', doITRFjump,KK, p, outl_factor), ...
+    sprintf('_itrf%d_KK%d_p%.1f_outl%d', doITRFjump,KK, p, outl_factor), ...
     '.csv']); % output: file name of computed trends (csv)
 
 % Set up matrix with results and LSE parameters
-resultM = [posixtime(dateIntvl'),  trenddata]; 
-resultM = [[result_parameterC{1, 2}, result_parameterC{2, 2}, NaN, NaN]; resultM]; % rmse, wrmse (second line)
-% needs 3 columns -> fill up with NaN
+resultM = [posixtime(dateIntvl'),  trenddata];
+resultM = [[200, result_parameters{1, 2}{2, 2}, result_parameters{2, 2}{2, 2}, result_parameters{3, 2}{2, 2}]; ...
+    resultM]; % 200: WRMS (third line)
+resultM = [[100, result_parameters{1, 2}{1, 2}, result_parameters{2, 2}{1, 2}, result_parameters{3, 2}{1, 2}]; ...
+    resultM]; % 100: RMS (second line)
 resultM = [[doITRFjump, KK, p, outl_factor]; resultM]; % LSE parameters (first line)
 
 % write matrix to csv file

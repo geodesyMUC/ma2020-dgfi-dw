@@ -23,7 +23,7 @@ stationname = 'RWSN'; %
 
 % result files to be analysed
 % get files according to their filename in the specified directory
-[Results, Result_params, Results_names] = findStationData(stationname, resultsLocation);
+[Results, Result_params, Results_names] = findStationData(stationname, resultsLocation, 3);
 
 % other variables (constants)
 coordinateSTR = {'East', 'North', 'Up'}; % used to label plots
@@ -62,69 +62,106 @@ currStationJumps = dataJump(TFJump, :);
 % All Jumps for current station where "Use" Column Element is set to "1"
 jumpTable = currStationJumps(currStationJumps.Use == 1, :);
 
-%% Visualize E - N - U separately
-for i = 1:3
-    figure
+% Adjust plot names
+result_names_cell = cellfun(@(x) strrep(x, stationname, ''), Results_names, 'UniformOutput', false);
+result_names_cell = cellfun(@(x) strrep(x, '_', ' '), result_names_cell, 'UniformOutput', false);
+result_names_cell = cellfun(@(x) strrep(x, '.csv', ''), result_names_cell, 'UniformOutput', false);
 
-    % Plot Measurements
-    pPts = plot(data{:, 'date'}, data{:, 2 + i}, ...
-        '.', 'markersize', 4, ...
-        'Color', [0, 0.4470, 0.7410], 'DisplayName', 'Observations');
+% %% Visualize E - N - U time series separately
+% for i = 1:3
+%     
+%     figure
+% 
+%     % Plot Measurements
+%     pPts = plot(data{:, 'date'}, data{:, 2 + i}, ...
+%         '.', 'markersize', 4, ...
+%         'Color', [0, 0.4470, 0.7410], 'DisplayName', 'Observations');
+%     
+%     ax = gca;
+%     y1 = ax.YLim(1); % axis MIN
+%     y2 = ax.YLim(2); % axis MAX
+%     
+%     grid on
+%     hold on
+%     
+%     % Plot Trend (j = 1:number of files)
+%     for j = 1:size(Results, 1)
+% %         % set up plot name
+% %         pTrendSplitName = strrep(Results_names{j}, '_', '-');
+% %         pTrendSplitName = strsplit(pTrendSplitName, '.');
+% %         pTrendName = [pTrendSplitName{1}, '.', pTrendSplitName{2}];
+%         % plot
+%         pTrend = plot(Results{j, 1}, Results{j, 1 + i}, 'DisplayName', result_names_cell{j});
+%     end
+%     
+%     ylabel(sprintf('%s [mm]', coordinateSTR{i}))
+%     xlim([min(data{:, 'date'}) max(data{:, 'date'})])
+%     title(titleString);
+%     
+%     % Plot Jumps from Jump Table
+%     for j = 1:size(jumpTable, 1)
+%         if jumpTable{j, 4} > 0 && jumpTable{j, 2} > data{1, 'date'} % if type matches and jump is AFTER first obs.
+%             % Earthquake
+%             pEq = plot([jumpTable{j, 2}; jumpTable{j, 2}], [y1; y2], ...
+%                 'color', [102, 51, 0]./255, 'DisplayName', 'EQ Jump');
+%         elseif jumpTable{j, 5} > 0 && jumpTable{j, 2} > data{1, 'date'}
+%             % Antenna Change, ...
+%             pAnt = plot([jumpTable{j, 2}; jumpTable{j, 2}], [y1; y2], ...
+%                 'color', [0.75, 0, 0.75], 'DisplayName', 'HW Change');
+%         elseif jumpTable{j, 6} > 0  && jumpTable{j, 2} > data{1, 'date'}
+%             % Unknown cause
+%             pUnk = plot([jumpTable{j, 2}; jumpTable{j, 2}], [y1; y2], ...
+%                 'color', [0.4660, 0.6740, 0.1880], 'DisplayName', 'Unkn.Jump');
+%         end
+%     end
+%     
+%     % plot itrf jump vertical lines
+%     for j = 1:length(jumpITRF)
+%         pITRF = plot([jumpITRF(j); jumpITRF(j)], [y1; y2], '--', ...
+%             'color', [160, 160, 200]./255, 'DisplayName', 'new ITRF');
+%     end
+%     
+%     hold off
+%     legend show
+%     % set location of legend to "best", needs legend handle
+%     hLegend = findobj(gcf, 'Type', 'Legend');
+%     hLegend.Location = 'northeastoutside';
+%     % change figure dimensions
+%     set(gcf, 'InnerPosition', [1000 1000 1500 600]); % large figure
+% end
+
+%% Visualize WRMS/RMS as bar graph
+fprintf('Evaluating Parameters of "%s".\n', stationname);
+
+for i = 1:3 % E, N, U
+    c = categorical(result_names_cell);
+    result_param_array = cell2mat(Result_params);
+    plotOffsetLimit = 0.1;
     
-    ax = gca;
-    y1 = ax.YLim(1); % axis MIN
-    y2 = ax.YLim(2); % axis MAX
-    
+    figure;
+    subplot(2, 1, 1) % RMS bar plot
+    data = result_param_array(2:3:end, i + 1);
+    [data, I] = sort(data, 'descend');
+    c = categorical(result_names_cell(I), result_names_cell(I));
+    barh(c, data, 'FaceColor', [0 0.4470 0.7410]);
     grid on
-    hold on
+    title(sprintf('Station "%s", RMS Comparison(%s)', stationname, coordinateSTR{i}));
+    ylabel('error [mm]')
+    xlim([min(data)-plotOffsetLimit, max(data)+plotOffsetLimit])
     
-    % Plot Trend
-    for j = 1:size(Results, 1)
-        % set up plot name
-        pTrendSplitName = strrep(Results_names{j}, '_', '-');
-        pTrendSplitName = strsplit(pTrendSplitName, '.');
-        pTrendName = [pTrendSplitName{1}, '.', pTrendSplitName{2}];
-        % plot
-        pTrend = plot(Results{j, 1}, Results{j, 1 + i}, 'DisplayName', pTrendName);
-    end
+    subplot(2, 1, 2) % WRMS bar plot
+    data = result_param_array(3:3:end, i + 1);
+    [data, I] = sort(data, 'descend');
+    c = categorical(result_names_cell(I), result_names_cell(I));  
+    barh(c, data, 'FaceColor', [0.8500 0.3250 0.0980]);
+    grid on
+    title(sprintf('Station "%s", WRMS Comparison(%s)', stationname, coordinateSTR{i}));
+    ylabel('error [mm]')
+    xlim([min(data)-plotOffsetLimit, max(data)+plotOffsetLimit] )
     
-    ylabel(sprintf('%s [mm]', coordinateSTR{i}))
-    xlim([min(data{:, 'date'}) max(data{:, 'date'})])
-    title(titleString);
-    
-    % Plot Jumps from Jump Table
-    for j = 1:size(jumpTable, 1)
-        if jumpTable{j, 4} > 0 && jumpTable{j, 2} > data{1, 'date'} % if type matches and jump is AFTER first obs.
-            % Earthquake
-            pEq = plot([jumpTable{j, 2}; jumpTable{j, 2}], [y1; y2], ...
-                'color', [102, 51, 0]./255, 'DisplayName', 'EQ Jump');
-        elseif jumpTable{j, 5} > 0 && jumpTable{j, 2} > data{1, 'date'}
-            % Antenna Change, ...
-            pAnt = plot([jumpTable{j, 2}; jumpTable{j, 2}], [y1; y2], ...
-                'color', [0.75, 0, 0.75], 'DisplayName', 'HW Change');
-        elseif jumpTable{j, 6} > 0  && jumpTable{j, 2} > data{1, 'date'}
-            % Unknown cause
-            pUnk = plot([jumpTable{j, 2}; jumpTable{j, 2}], [y1; y2], ...
-                'color', [0.4660, 0.6740, 0.1880], 'DisplayName', 'Unkn.Jump');
-        end
-    end
-    
-    % plot itrf jump vertical lines
-    for j = 1:length(jumpITRF)
-        pITRF = plot([jumpITRF(j); jumpITRF(j)], [y1; y2], '--', ...
-            'color', [160, 160, 200]./255, 'DisplayName', 'new ITRF');
-    end
-    
-    hold off
-    legend show
-    % set location of legend to "best", needs legend handle
-    hLegend = findobj(gcf, 'Type', 'Legend');
-    hLegend.Location = 'northeastoutside';
-    % change figure dimensions
-    set(gcf, 'InnerPosition', [1000 1000 1500 600]); % large figure
 end
 
-function [Result_array, Result_params, Result_names] = findStationData(stationname, location)
+function [Result_array, Result_params, Result_names] = findStationData(stationname, location, headerCnt)
 % get file list
 fList = dir([location, '/', stationname, '*.csv']);
 % fList([1 5 6 7]) = [] % REMOVE FILES FROM ANALYSIS MANUALLY
@@ -139,13 +176,13 @@ Result_params = cell(n_files, 1);
 for i = 1:n_files
     readInData = csvread(fullfile(fList(i).folder, fList(i).name));
     
-    Result_params{i} = readInData(1:2, :); % first 2 rows
+    Result_params{i} = readInData(1:headerCnt, :); % first 3 rows
     
     % remaining rows -> data
-    Result_array{i, 1} = datetime(readInData(3:end, 1), 'ConvertFrom', 'posixtime', 'TimeZone', 'UTC');
-    Result_array{i, 2} = readInData(3:end, 2); % E
-    Result_array{i, 3} = readInData(3:end, 3); % N
-    Result_array{i, 4} = readInData(3:end, 4); % U
+    Result_array{i, 1} = datetime(readInData(headerCnt + 1:end, 1), 'ConvertFrom', 'posixtime', 'TimeZone', 'UTC');
+    Result_array{i, 2} = readInData(headerCnt + 1:end, 2); % E
+    Result_array{i, 3} = readInData(headerCnt + 1:end, 3); % N
+    Result_array{i, 4} = readInData(headerCnt + 1:end, 4); % U
     
     
     % filename
