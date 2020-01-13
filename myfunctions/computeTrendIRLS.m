@@ -116,7 +116,10 @@ w_i = ones(size(b, 1), 1);
 % E = zeros(KK, 1);
 
 % compute WEIGHTED RMS and RMS error -> store in result cell
-wrmse_ = sqrt(1/nData * sum(w_i .* (b - A * xEst).^2));
+error_p2norm = norm(e, 2);
+
+% wrmse_ = sqrt(1/nData * sum(w_i .* (b - A * xEst).^2));
+wrmse_ = sqrt(sum(w_i .* (b - A * xEst).^2)/sum(w_i));
 rmse_ = sqrt(1/nData * sum((b - A * xEst).^2));
 
 % debug %%%%%%%%%%%%%%%%%%%%%%
@@ -161,7 +164,7 @@ for k = 1:KK
     ee = norm(e, p); % error at each iteration
     E = [E ee];
     
-    wrms_ = sqrt(1/nData * sum(w_i .* (b - A * xEst).^2));
+    wrms_ = sqrt(sum(w_i .* (b - A * xEst).^2)/sum(w_i));
     rms_ = sqrt(1/nData * sum(b - A * xEst).^2);
     
     RMS_ = [RMS_ rmse_];
@@ -178,11 +181,13 @@ title('rms/wrms error')
 
 figure
 plot(1:KK, E, 'bx-')
+hold on
+plot(0, error_p2norm, 'gx', 'markersize', 10, 'linewidth', 3);
 grid on
 title('irls error')
 
 % compute WEIGHTED RMS and RMS error -> store in result cell
-wrmse = sqrt(1/nData * sum(w_i .* (b - A * xEst).^2));
+wrmse = sqrt(sum(w_i .* (b - A * xEst).^2)/sum(w_i));
 rmse = sqrt(1/nData * sum((b - A * xEst).^2));
 
 results{1, 1} = 'rms';

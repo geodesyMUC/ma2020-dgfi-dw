@@ -115,18 +115,17 @@ end
 w_i = ones(size(b, 1), 1);
 % E = zeros(KK, 1);
 
-% debug %%%%%%%%%%%%%%%%
-E = [];
-RMS_ = [];
-WRMS_ = [];
-
-figure 
 % compute WEIGHTED RMS and RMS error -> store in result cell
-wrmse_ = sqrt(1/nData * sum(w_i .* (b - A * xEst).^2));
+error_p2norm = norm(e, 2);
+
+% wrmse_ = sqrt(1/nData * sum(w_i .* (b - A * xEst).^2));
+wrmse_ = sqrt(sum(w_i .* (b - A * xEst).^2)/sum(w_i));
 rmse_ = sqrt(1/nData * sum((b - A * xEst).^2));
-plot(0, wrmse_,'bx')
-plot(0, rmse_, 'mx')
-hold on
+
+% debug %%%%%%%%%%%%%%%%%%%%%%
+E = [];
+RMS_ = [rmse_];
+WRMS_ = [wrmse_];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 for k = 1:KK
@@ -162,28 +161,33 @@ for k = 1:KK
     xEst = lsqInvMMult(WA' * WA, (WA' * Wmat) * b);
     
     %% Error each iteration (Used for Debugging/Monitoring iterative procedure)
-    ee = norm(e, p);
+    ee = norm(e, p); % error at each iteration
     E = [E ee];
     
-    wrmse_ = sqrt(1/nData * sum(w_i .* (b - A * xEst).^2));
-    rmse_ = sqrt(1/nData * sum(b - A * xEst).^2);
+    wrms_ = sqrt(sum(w_i .* (b - A * xEst).^2)/sum(w_i));
+    rms_ = sqrt(1/nData * sum(b - A * xEst).^2);
     
     RMS_ = [RMS_ rmse_];
+    WRMS_ = [WRMS_ wrms_];
     
-    
-    plot(k, wrmse_,'bx-')
-    plot(k, rmse_, 'mx-')
-    hold on
 end
+
+figure
+plot(0:KK, RMS_, 'bx-')
+hold on
+plot(0:KK, WRMS_, 'mx-')
 grid on
-hold off
+title('rms/wrms error')
 
 figure
 plot(1:KK, E, 'bx-')
+hold on
+plot(0, error_p2norm, 'gx', 'markersize', 10, 'linewidth', 3);
 grid on
+title('irls error')
 
 % compute WEIGHTED RMS and RMS error -> store in result cell
-wrmse = sqrt(1/nData * sum(w_i .* (b - A * xEst).^2));
+wrmse = sqrt(sum(w_i .* (b - A * xEst).^2)/sum(w_i));
 rmse = sqrt(1/nData * sum((b - A * xEst).^2));
 
 results{1, 1} = 'rms';
