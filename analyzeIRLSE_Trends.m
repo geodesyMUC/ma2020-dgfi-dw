@@ -12,15 +12,17 @@ jumpCSVLocation = 'jumps_version3.csv'; % Location of Jump Table/Jump Database
 resultsLocation = 'TSA_TrendComputationResults';
 
 %%% Name of station to be analysed %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SELECTION FOR ANALYSIS
+
 % stationname = 'MEXI'; % Mexicali, Mexico
 % stationname = 'ALAR'; % Arapiraca, Brazil
 % stationname = 'AREQ'; % Arequipa, Peru
 % stationname = 'CONZ'; % Concepcion, Chile
-stationname = 'OAX2'; % Oaxaca, Mexico
-% stationname = 'MZAE'; %
-% stationname = 'CUEC'; % 
-% stationname = 'NEIL'; % 
-% stationname = 'RWSN'; % 
+% stationname = 'OAX2'; % Oaxaca, Mexico
+stationname = 'CUEC'; % Cuenca, Ecuador
+% stationname = 'MZAE'; % Santa Rosa, Argentina (missing jump)
+% stationname = 'NEIL'; % Ciudad Neilly, Costa Rica
+% stationname = 'RWSN'; % Rawson, Argentina
 
 % result files to be analysed
 % get files according to their filename in the specified directory

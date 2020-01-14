@@ -107,22 +107,24 @@ if nnz(outlierLogical) > 0
     
     % Option 3 --- Use Function
     xEst = lsqInvMMult(A' * A, A' * b);
-    
+    % update error vector
+    e = A * xEst - b;
+    % update nData
+    nData = length(b);
 end  
 
 %% IRLS - weight optimization
 % (IRLS: Iterative Reweighted Least Squares, C.Sidney Burrus)
 w_i = ones(size(b, 1), 1);
-% E = zeros(KK, 1);
 
 % compute WEIGHTED RMS and RMS error -> store in result cell
-error_p2norm = norm(e, 2);
+error_p2norm = norm(e, p);
 
 % wrmse_ = sqrt(1/nData * sum(w_i .* (b - A * xEst).^2));
 wrmse_ = sqrt(sum(w_i .* (b - A * xEst).^2)/sum(w_i));
 rmse_ = sqrt(1/nData * sum((b - A * xEst).^2));
 
-% debug %%%%%%%%%%%%%%%%%%%%%%
+% debugging/irls algorithm monitoring values %%%%%%%%%%%%%%%%%%%%%%
 E = [];
 RMS_ = [rmse_];
 WRMS_ = [wrmse_];
@@ -165,9 +167,9 @@ for k = 1:KK
     E = [E ee];
     
     wrms_ = sqrt(sum(w_i .* (b - A * xEst).^2)/sum(w_i));
-    rms_ = sqrt(1/nData * sum(b - A * xEst).^2);
+    rms_ = sqrt(1/nData * sum((b - A * xEst).^2));
     
-    RMS_ = [RMS_ rmse_];
+    RMS_ = [RMS_ rms_];
     WRMS_ = [WRMS_ wrms_];
     
 end
@@ -184,7 +186,8 @@ plot(1:KK, E, 'bx-')
 hold on
 plot(0, error_p2norm, 'gx', 'markersize', 10, 'linewidth', 3);
 grid on
-title('irls error')
+title(sprintf('irls error: p norm (p=%.1f)', p))
+ylabel('p norm [mm]')
 
 % compute WEIGHTED RMS and RMS error -> store in result cell
 wrmse = sqrt(sum(w_i .* (b - A * xEst).^2)/sum(w_i));
