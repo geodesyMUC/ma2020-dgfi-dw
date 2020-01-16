@@ -18,8 +18,8 @@ resultsLocation = 'TSA_TrendComputationResults';
 % stationname = 'ALAR'; % Arapiraca, Brazil
 % stationname = 'AREQ'; % Arequipa, Peru
 % stationname = 'CONZ'; % Concepcion, Chile
-% stationname = 'OAX2'; % Oaxaca, Mexico
-stationname = 'CUEC'; % Cuenca, Ecuador
+stationname = 'OAX2'; % Oaxaca, Mexico
+% stationname = 'CUEC'; % Cuenca, Ecuador
 % stationname = 'MZAE'; % Santa Rosa, Argentina (missing jump)
 % stationname = 'NEIL'; % Ciudad Neilly, Costa Rica
 % stationname = 'RWSN'; % Rawson, Argentina
@@ -74,7 +74,7 @@ result_names_cell = cellfun(@(x) strrep(x, '.csv', ''), result_names_cell, 'Unif
 for i = 1:3
     
     figure
-
+    
     % Plot Measurements
     pPts = plot(data{:, 'date'}, data{:, 2 + i}, ...
         '.', 'markersize', 4, ...

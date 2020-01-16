@@ -64,12 +64,12 @@ P(2) = 1/2;
 T = 1;
 
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
-doITRFjump = false; % E - N - U
+doITRFjump = true; % E - N - U
 
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
-KK = 0; % n of iterations for IRLS
-p = 2.0; % L_p Norm for IRLS
-outl_factor = 3; % median(error) + standard deviation * factor -> outlier
+KK = 100; % n of iterations for IRLS
+p = 1.5; % L_p Norm for IRLS
+outl_factor = 4; % median(error) + standard deviation * factor -> outlier
 
 %%% Output %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 logFileFolder = 'TSA_TrendComputationResults'; % output: log file directory
@@ -170,6 +170,8 @@ else
 end
 
 %% 
+
+
 
 %% Prepare Trend Estimation
 % preallocate arrays ---
