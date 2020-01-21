@@ -16,9 +16,9 @@ resultsLocation = 'TSA_TrendComputationResults';
 
 % stationname = 'MEXI'; % Mexicali, Mexico
 % stationname = 'ALAR'; % Arapiraca, Brazil
-% stationname = 'AREQ'; % Arequipa, Peru
+stationname = 'AREQ'; % Arequipa, Peru
 % stationname = 'CONZ'; % Concepcion, Chile
-stationname = 'OAX2'; % Oaxaca, Mexico
+% stationname = 'OAX2'; % Oaxaca, Mexico
 % stationname = 'CUEC'; % Cuenca, Ecuador
 % stationname = 'MZAE'; % Santa Rosa, Argentina (missing jump)
 % stationname = 'NEIL'; % Ciudad Neilly, Costa Rica

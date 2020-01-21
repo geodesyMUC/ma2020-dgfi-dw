@@ -41,11 +41,12 @@ jumpCSVLocation = 'jumps_version3.csv'; % Location of Jump Table/Jump Database
 % stationname = 'ALAR'; % Arapiraca, Brazil
 % stationname = 'AREQ'; % Arequipa, Peru
 % stationname = 'CONZ'; % Concepcion, Chile
-stationname = 'OAX2'; % Oaxaca, Mexico
+% stationname = 'OAX2'; % Oaxaca, Mexico
 % stationname = 'CUEC'; % Cuenca, Ecuador
-% stationname = 'MZAE'; % Santa Rosa, Argentina (missing jump)
+stationname = 'MZAE'; % Santa Rosa, Argentina (missing jump)
 % stationname = 'NEIL'; % Ciudad Neilly, Costa Rica
 % stationname = 'RWSN'; % Rawson, Argentina
+% stationname = 'PBJP'; %
 
 %%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Polynomial Trend: Degree
@@ -67,9 +68,9 @@ T = 1;
 doITRFjump = true; % E - N - U
 
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
-KK = 100; % n of iterations for IRLS
-p = 1.5; % L_p Norm for IRLS
-outl_factor = 4; % median(error) + standard deviation * factor -> outlier
+KK = 0; % n of iterations for IRLS
+p = 2.0; % L_p Norm for IRLS
+outl_factor = 5; % median(error) + standard deviation * factor -> outlier
 
 %%% Output %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 logFileFolder = 'TSA_TrendComputationResults'; % output: log file directory
