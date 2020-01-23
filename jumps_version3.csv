@@ -76,10 +76,10 @@ COL2;2016-05-12;disc;0;1;0;1
 CONZ;2002-06-10;Antenna & receiver change;0;1;0;1
 CONZ;2005-05-18;-;0;0;1;1
 CONZ;2010-02-27;Chile EQ;1;0;0;1
-CONZ;2011-02-12;;1;0;0;1
+CONZ;2011-02-12;;1;0;0;0
 COPO;2002-07-01;Copiapo earthquake (5,3);1;0;0;1
 COPO;2006-04-30;EQ;1;0;0;1
-COPO;2006-05-03;Antenna & receiver change;0;1;0;1
+COPO;2006-05-03;Antenna & receiver change;0;1;0;0
 COPO;2008-07-05;-;0;0;1;1
 COPO;2010-02-27;Chile EQ;1;0;0;1
 CORD;2000-01-02;Receiver change;0;1;0;1
@@ -190,7 +190,6 @@ MZAC;2015-09-16;chile eq 2015;1;0;0;1
 MZAC;2016-03-16;disc;0;1;0;1
 MZAC;2016-11-15;disc;0;1;0;1
 MZAC;2017-08-07;disc;0;1;0;1
-MZAE;2010-02-27;Chile EQ;1;0;0;1
 MZAE;2010-02-27;Chile EQ;1;0;0;1
 MZAE;2012-12-05;disc;0;1;0;1
 MZAE;2015-09-16;chile eq 2015;1;0;0;1

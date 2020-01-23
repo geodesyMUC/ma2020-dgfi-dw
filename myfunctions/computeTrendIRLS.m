@@ -1,13 +1,13 @@
 function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, nPolyn, w, jt, eqjt, T, KK, p, outl_factor)
 % LSE
 % INPUT
-% x: vector containing time stamps (years since t0)
+% x: vector containing time stamps in [SECONDS] relative to t0
 % b: vector containing measurements
-% degree: power of polynome
+% degree: power of polynome denoting station velocity
 % w: vector containing periods (! rad)
-% jt: vector containing jump indices (if not specified -> empty)
-% eqjt: vector containing jump indices for earthquakes (if not specified -> empty)
-% T: Logarithmic Transient Parameter
+% jt: vector containing jump indices in [SECONDS] relative to t0 (if not specified -> empty)
+% eqjt: vector containing jump indices for earthquakes in [SECONDS] relative to t0 (if not specified -> empty)
+% T: Logarithmic Transient Parameter, will be set to 1 if not specified
 
 % -> the following parameter definitions were moved outside of the function
 % to main.
@@ -25,6 +25,12 @@ if nargin == 6
     T = 1; % assign default value 1y for logar. transient parameter T
 end
 
+% convert datetimes to from [seconds] to [year]
+x = x./(365.25 * 86400);
+jt = jt./(365.25 * 86400);
+eqjt = eqjt./(365.25 * 86400);
+
+% parameter counts
 nData = length(x); % number of measurements
 nPolynTerms = nPolyn + 1; % 0, 1, 2, ... 
 nPeriodic = length(w); % oscillations
@@ -71,7 +77,7 @@ for i = 1:nEqJumps
     A(:, N(4) + i) = log(1 + dt ./ T);
 end
 
-%% Calculate initial parameters xEst from A, b
+%% (1) Calculate initial parameters xEst from A, b
 
 % % Option 1 -----
 % Nmat = A'*A; % normal equations
@@ -86,7 +92,7 @@ end
 % Option 3 --- Use Function
 xEst = lsqInvMMult(A' * A, A' * b);
 
-%% Detect & Remove outliers
+%% (2) Detect & Remove outliers
 e = A * xEst - b; % Error vector
 
 % check if outliers are present
@@ -113,12 +119,12 @@ if nnz(outlierLogical) > 0
     nData = length(b);
 end  
 
-%% IRLS - weight optimization
+%% (3) IRLS - weight optimization
 % (IRLS: Iterative Reweighted Least Squares, C.Sidney Burrus)
 w_i = ones(size(b, 1), 1);
 
 % compute WEIGHTED RMS and RMS error -> store in result cell
-error_p2norm = norm(e, p);
+error_pnorm = norm(e, p);
 
 % wrmse_ = sqrt(1/nData * sum(w_i .* (b - A * xEst).^2));
 wrmse_ = sqrt(sum(w_i .* (b - A * xEst).^2)/sum(w_i));
@@ -174,6 +180,8 @@ for k = 1:KK
     
 end
 
+
+%% (4) QA Plots & Stats
 figure
 plot(0:KK, RMS_, 'bx-')
 hold on
@@ -201,7 +209,7 @@ results{2, 2} = wrmse;
 
 fprintf('WMRS = %.4f, RMS = %.4f\n', wrmse, rmse);
 
-%% sample equidistant values for TIME
+%% (5) sample equidistant values for TIME
 % -> for time series with LSE estimated parameters
 
 % Get Parameters and apply them on equally spaced time series

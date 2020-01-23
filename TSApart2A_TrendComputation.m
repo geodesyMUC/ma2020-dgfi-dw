@@ -40,10 +40,10 @@ jumpCSVLocation = 'jumps_version3.csv'; % Location of Jump Table/Jump Database
 % stationname = 'MEXI'; % Mexicali, Mexico
 % stationname = 'ALAR'; % Arapiraca, Brazil
 % stationname = 'AREQ'; % Arequipa, Peru
-% stationname = 'CONZ'; % Concepcion, Chile
+stationname = 'CONZ'; % Concepcion, Chile
 % stationname = 'OAX2'; % Oaxaca, Mexico
 % stationname = 'CUEC'; % Cuenca, Ecuador
-stationname = 'MZAE'; % Santa Rosa, Argentina (missing jump)
+% stationname = 'MZAE'; % Santa Rosa, Argentina (missing jump)
 % stationname = 'NEIL'; % Ciudad Neilly, Costa Rica
 % stationname = 'RWSN'; % Rawson, Argentina
 % stationname = 'PBJP'; %
@@ -65,11 +65,11 @@ P(2) = 1/2;
 T = 1;
 
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
-doITRFjump = true; % E - N - U
+doITRFjump = false; % E - N - U
 
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
-KK = 0; % n of iterations for IRLS
-p = 2.0; % L_p Norm for IRLS
+KK = 10; % n of iterations for IRLS
+p = 1.5; % L_p Norm for IRLS
 outl_factor = 5; % median(error) + standard deviation * factor -> outlier
 
 %%% Output %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -125,13 +125,13 @@ VisualizeTS_ENU2(data, dataSTATION_NAME, currStationJumps{:, 2}, ...
 %% PREPARE PARAMETERS FOR TREND ESTIMATION
 % convert time to YEARS (=365.25 days)
 % reason: Numerical Stability in LSE matrix inversion
-t = data{:, 't'} ./(365.25 * 86400);
+t = data{:, 't'}; %./(365.25 * 86400);
 
 % convert oscillations to angular velocity
 W = 2 * pi ./ P;
 
 % Jump table
-% Convert jump to years since t0 (= beginning of TS)
+% Convert jumps to years since t0 (= beginning of TS)
 t0 = data{1, 'date'};
 % subtract time first TS observation to get relative times
 jumps0 = etime(datevec(currStationJumps{:, 2}), ...
@@ -139,7 +139,7 @@ jumps0 = etime(datevec(currStationJumps{:, 2}), ...
 % remove negative values -> jumps BEFORE Time Series starts
 jumps0x = jumps0(jumps0 >= 0);
 % convert jump times to years (365.25!!!! days) and sort asc
-jumps0x = sort(jumps0x ./(365.25 * 86400));
+jumps0x = sort(jumps0x);% ./(365.25 * 86400));
 % Assign to Heaviside Jumps Array
 HJumps = [jumps0x];
 
@@ -162,7 +162,7 @@ if doITRFjump
     % remove negative values -> itrf jumps BEFORE Time Series starts
     jumps0itrf = jumps0itrf(jumps0itrf >= 0);
     % convert jump times to years (365.25!!!! days) and sort asc
-    jumps0itrf = sort(jumps0itrf ./(365.25 * 86400));
+    jumps0itrf = sort(jumps0itrf);% ./(365.25 * 86400));
     
     % append to heaviside jumps vector
     HJumps = [HJumps; jumps0itrf]; % HeavisideJump
@@ -200,7 +200,7 @@ fprintf(fID, 'Jump table (Heaviside):\n');
 for i = 1:length(HJumps)
     % Print Jump Datetime Information
     fprintf(fID, 'J(%d) = t0 + %.2f y | %s\n', i, HJumps(i), ...
-        datestr(t0 + seconds(HJumps(i) * (365.25 * 86400)), 'yyyy-mm-dd HH:MM'));
+        datestr(t0 + seconds(HJumps(i)), 'yyyy-mm-dd HH:MM'));
 end
 
 % EQ
@@ -208,7 +208,7 @@ fprintf(fID, '\nEarthquake Jump table (Heaviside + Logarithmic Transient):\n');
 for i = 1:length(EQHJump)
     % Print Jump Datetime Information
     fprintf(fID, 'J(%d) = t0 + %.2f y | %s\n', i, EQHJump(i), ...
-        datestr(t0 + seconds(EQHJump(i) * (365.25 * 86400)), 'yyyy-mm-dd HH:MM'));
+        datestr(t0 + seconds(EQHJump(i)), 'yyyy-mm-dd HH:MM'));
 end
 % LSE/IRLSE
 fprintf(fID, ['\nIRLSE/LSE Parameters:\nKK = %d (n of Iterations in IRLSE)\np = %.1f (L_p Norm used for IRLS)\n', ...
