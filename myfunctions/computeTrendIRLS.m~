@@ -2,13 +2,13 @@ function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, nPolyn, w, 
 % LSE
 % INPUT
 % x: vector containing time stamps in [SECONDS] relative to t0
-% b: vector containing measurements
-% degree: power of polynome denoting station velocity
-% w: vector containing periods (! rad)
+% b: vector containing observations
+% degree: integer power of polynome denoting station velocity
+% w: vector containing periods in [RAD]
 % jt: vector containing jump indices in [SECONDS] relative to t0 (if not specified -> empty)
 % eqjt: vector containing jump indices for earthquakes in [SECONDS] relative to t0 (if not specified -> empty)
-% T: Logarithmic Transient Parameter, will be set to 1 if not specified
-
+% T: Logarithmic Transient Parameter in [YEARS], will be set to 1 if not specified
+% (Note: t0 is
 % -> the following parameter definitions were moved outside of the function
 % to main.
 if nargin <= 7
@@ -25,6 +25,12 @@ if nargin == 6
     T = 1; % assign default value 1y for logar. transient parameter T
 end
 
+% convert datetimes to from [seconds] to [years]
+x = x./(365.25 * 86400);
+jt = jt./(365.25 * 86400);
+eqjt = eqjt./(365.25 * 86400);
+
+% parameter counts
 nData = length(x); % number of measurements
 nPolynTerms = nPolyn + 1; % 0, 1, 2, ... 
 nPeriodic = length(w); % oscillations

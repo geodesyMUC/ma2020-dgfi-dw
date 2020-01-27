@@ -2,30 +2,34 @@ function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, nPolyn, w, 
 % LSE
 % INPUT
 % x: vector containing time stamps in [SECONDS] relative to t0
-% b: vector containing measurements
-% degree: power of polynome denoting station velocity
-% w: vector containing periods (! rad)
+% b: vector containing observations
+% degree: integer power of polynome denoting station velocity
+% w: vector containing periods in [RAD]
 % jt: vector containing jump indices in [SECONDS] relative to t0 (if not specified -> empty)
 % eqjt: vector containing jump indices for earthquakes in [SECONDS] relative to t0 (if not specified -> empty)
-% T: Logarithmic Transient Parameter, will be set to 1 if not specified
+% T: Logarithmic Transient Parameter in [YEARS], will be set to 1 if not specified
+% (Note: t0 refers to the datetime of the first observation)
+% KK: number of iterations for IRLS
+% p: L_p Norm for IRLS. p=2 equals to the euclidean norm or L2. 
+% If p=2, no reweighting will be applied, independent of the number of iterations KK
+% outl_factor: median(error)|mean(error) + standard deviation * factor -> outlier
 
-% -> the following parameter definitions were moved outside of the function
-% to main.
 if nargin <= 7
     % Additional Parameters (default values)
     KK = 0; % n of iterations for IRLS
     p = 2.0; % L_p Norm for IRLS
     outl_factor = 4; % median(error) + standard deviation * factor -> outlier
+    fprintf('No IRLS parameters defined. Calculating L2 norm LSE.\n')
 end
 
 fprintf('n of iterations for IRLS = %d,\np of L_p Norm for IRLS = %.2f,\nOutlier Factor = %d (median of error + standard deviation * factor < outlier)\n', ...
     KK, p, outl_factor);
 
-if nargin == 6
+if nargin == 6 || nargin == 9
     T = 1; % assign default value 1y for logar. transient parameter T
 end
 
-% convert datetimes to from [seconds] to [year]
+% convert datetimes to from [seconds] to [years]
 x = x./(365.25 * 86400);
 jt = jt./(365.25 * 86400);
 eqjt = eqjt./(365.25 * 86400);
