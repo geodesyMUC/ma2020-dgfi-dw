@@ -12,7 +12,7 @@ jumps0x = jumps0(jumps0 >= 0);
 % sort jumps
 jumps0x = sort(jumps0x);% ./(365.25 * 86400));
 
-% result jumps vector %(can be converted to years if needed)
+% resulting relative jumps vector %(can be converted to years if needed)
 jumps = [jumps0x]; % jumps0x./(365.25 * 86400)
 
 end

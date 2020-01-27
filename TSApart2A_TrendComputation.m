@@ -130,7 +130,7 @@ VisualizeTS_ENU2(data, dataSTATION_NAME, currStationJumps{:, 2}, ...
 t = data{:, 't'}; % [seconds]; for years, do /(365.25 * 86400);
 t0 = data{1, 'date'}; % beginning of ts as datetime
 
-%% Jump table
+%% Jump table(s)
 HJumps = getRelativeJumps(currStationJumps{:, 2}, t0);
 
 % Distinguish between EQs (invokes log. transient) and other jumps (unknown cause or HW
@@ -145,8 +145,8 @@ if doITRFjump
     
     jumps0itrf = getRelativeITRFJumps(t0, itrf_changes_textfile);
     
-    % append to heaviside jumps vector
-    HJumps = [HJumps; jumps0itrf]; % HeavisideJump
+    % append itrf jumps to heaviside jumps vector
+    HJumps = [HJumps; jumps0itrf];
 else
     fprintf('Not considering ITRF jumps, doITRFjump is set to "false".\n')
 end
