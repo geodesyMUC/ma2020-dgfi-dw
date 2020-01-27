@@ -65,7 +65,7 @@ P(2) = 1/2;
 T = 1;
 
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
-doITRFjump = false; % E - N - U
+doITRFjump = true; % E - N - U
 
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
 KK = 10; % n of iterations for IRLS
@@ -103,7 +103,7 @@ end
 data = currStation.Data;
 dataSTATION_NAME = currStation.Station;
 
-% Load Jump Table using custom import function (read from database)
+% Load Jump Table using custom import function
 dataJump = importfileJumpCSV(jumpCSVLocation);
 
 % Get jumps for this station
@@ -123,31 +123,21 @@ VisualizeTS_ENU2(data, dataSTATION_NAME, currStationJumps{:, 2}, ...
     'jumpTypes', currStationJumps{:, 4:5});
 
 %% PREPARE PARAMETERS FOR TREND ESTIMATION
-% convert time to YEARS (=365.25 days)
 % reason: Numerical Stability in LSE matrix inversion
-t = data{:, 't'} ./(365.25 * 86400);
+t = data{:, 't'}; % [seconds]; for years, do /(365.25 * 86400);
+t0 = data{1, 'date'}; % beginning of ts as datetime
 
 % convert oscillations to angular velocity
 W = 2 * pi ./ P;
 
-% Jump table
-% Convert jumps to years since t0 (= beginning of TS)
-t0 = data{1, 'date'};
-% subtract time first TS observation to get relative times
-jumps0 = etime(datevec(currStationJumps{:, 2}), ...
-    datevec(repmat(t0, size(currStationJumps, 1), 1)));
-% remove negative values -> jumps BEFORE Time Series starts
-jumps0x = jumps0(jumps0 >= 0);
-% convert jump times to years (365.25!!!! days) and sort asc
-jumps0x = sort(jumps0x ./(365.25 * 86400));
-% Assign to Heaviside Jumps Array
-HJumps = [jumps0x];
+%% Jump table
+HJumps = getRelativeJumps(currStationJumps{:, 2}, t0);
 
 % Distinguish between EQs (invokes log. transient) and other jumps (unknown cause or HW
 % change -> do not invoke transient)
-EQLogical = logical(currStationJumps{(jumps0 >= 0), 4}); 
-% 1=eq, 0=other. negative time indicates jump happened before TS started
-EQHJump = [jumps0x(EQLogical)]; % EarthquakeHeavisideJump -> Calc Transient
+EQLogical = logical(currStationJumps{:, 4}); % 1:=earthquake; ~1:=no earthquake
+% Get Earthquake U
+EQJump = getRelativeJumps_eq(currStationJumps{:, 2}, t0, EQLogical2); 
 
 %% Add ITRF Realization Change Jumps
 % format yyyy-MM-dd, 
@@ -162,7 +152,7 @@ if doITRFjump
     % remove negative values -> itrf jumps BEFORE Time Series starts
     jumps0itrf = jumps0itrf(jumps0itrf >= 0);
     % convert jump times to years (365.25!!!! days) and sort asc
-    jumps0itrf = sort(jumps0itrf ./(365.25 * 86400));
+    jumps0itrf = sort(jumps0itrf);% ./(365.25 * 86400));
     
     % append to heaviside jumps vector
     HJumps = [HJumps; jumps0itrf]; % HeavisideJump
@@ -200,15 +190,15 @@ fprintf(fID, 'Jump table (Heaviside):\n');
 for i = 1:length(HJumps)
     % Print Jump Datetime Information
     fprintf(fID, 'J(%d) = t0 + %.2f y | %s\n', i, HJumps(i), ...
-        datestr(t0 + seconds(HJumps(i) * (365.25 * 86400)), 'yyyy-mm-dd HH:MM'));
+        datestr(t0 + seconds(HJumps(i)), 'yyyy-mm-dd HH:MM'));
 end
 
 % EQ
 fprintf(fID, '\nEarthquake Jump table (Heaviside + Logarithmic Transient):\n');
-for i = 1:length(EQHJump)
+for i = 1:length(EQJump)
     % Print Jump Datetime Information
-    fprintf(fID, 'J(%d) = t0 + %.2f y | %s\n', i, EQHJump(i), ...
-        datestr(t0 + seconds(EQHJump(i) * (365.25 * 86400)), 'yyyy-mm-dd HH:MM'));
+    fprintf(fID, 'J(%d) = t0 + %.2f y | %s\n', i, EQJump(i), ...
+        datestr(t0 + seconds(EQJump(i)), 'yyyy-mm-dd HH:MM'));
 end
 % LSE/IRLSE
 fprintf(fID, ['\nIRLSE/LSE Parameters:\nKK = %d (n of Iterations in IRLSE)\np = %.1f (L_p Norm used for IRLS)\n', ...
@@ -217,15 +207,15 @@ fprintf(fID, ['\nIRLSE/LSE Parameters:\nKK = %d (n of Iterations in IRLSE)\np = 
 
 fprintf(fID, '\n### LEAST SQUARE ESTIMATION ###\n');
 fprintf(fID, 'Using Moore-Penrose pseudoinverse for Inversion of normal equation matrix when needed\n');
-fprintf(fID, '\n### OUTPUT RESULTS ###\n');
 % other variables - get count of unknowns for each type (poly, osc, jumps,
 % transients)
 nPolynTerms = polynDeg + 1; % 0, 1, 2, ... 
 nOscParam = length(W) * 2; % cos & sin components (C, S) for every oscillation
 nJumps = length(HJumps); % All Jumps - From DB and ITRF (if set to true)
-nEQJumps = length(EQHJump); % Only EQ Jumps -> n of transients
+nEQJumps = length(EQJump); % Only EQ Jumps -> n of transients
 
 %% Trend Estimation INCLUDING EQ Transients
+fprintf(fID, '\n### OUTPUT RESULTS ###\n');
 fprintf(fID, '-- Logarithmic Transients for Earthquakes estimated --\n\n');
 
 for i = 1:3
@@ -236,7 +226,7 @@ for i = 1:3
         polynDeg, ...  % polynome degree
         W, ...  % periods
         HJumps, ...  % jumps: time in years since t0
-        EQHJump, ... % eqs jumps: time in years since t0
+        EQJump, ... % eqs jumps: time in years since t0
         T, ... %  logar. transient parameter T for earthquakes
         KK, ... % n of iterations for IRLS
         p, ... % L_p Norm for IRLS
@@ -266,7 +256,7 @@ for i = 1:3
     else
         strH = 'None estimated';
     end
-    if ~isempty(EQHJump)
+    if ~isempty(EQJump)
         strEQ = sprintf('A(%d) = % .2fmm\n', [1:nEQJumps; ...
             xEst(...
             nPolynTerms + nOscParam + nJumps + 1:...
