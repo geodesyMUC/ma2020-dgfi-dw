@@ -124,10 +124,16 @@ if nnz(outlierLogical) > 0
 end  
 
 %% (3) IRLS - weight optimization
+% to prevent unwanted behaviour when computing trends for TS with multiple
+% jumps close to each other in time, apply the xEst parameters for jumps to
+% trend, then compute new xEst
+
+% WORK IN PROGRESS @27.1.2020
+
 % (IRLS: Iterative Reweighted Least Squares, C.Sidney Burrus)
 w_i = ones(size(b, 1), 1);
 
-% compute WEIGHTED RMS and RMS error -> store in result cell
+% compute WEIGHTED RMS and RMS error
 error_pnorm = norm(e, p);
 
 % wrmse_ = sqrt(1/nData * sum(w_i .* (b - A * xEst).^2));

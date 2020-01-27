@@ -33,17 +33,17 @@ addpath('myfunctions')
 %%% INPUT data settings %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 inputFolder = 'station_data'; % Where Station Data (TSA_ReadAndTransform) is stored as ".mat"
 jumpCSVLocation = 'jumps_version3.csv'; % Location of Jump Table/Jump Database
-
+itrf_changes_textfile = 'itrf_changes.txt';
 %%% Name of station to be analysed %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SELECTION FOR ANALYSIS
 
 % stationname = 'MEXI'; % Mexicali, Mexico
 % stationname = 'ALAR'; % Arapiraca, Brazil
 % stationname = 'AREQ'; % Arequipa, Peru
-stationname = 'CONZ'; % Concepcion, Chile
+% stationname = 'CONZ'; % Concepcion, Chile
 % stationname = 'OAX2'; % Oaxaca, Mexico
 % stationname = 'CUEC'; % Cuenca, Ecuador
-% stationname = 'MZAE'; % Santa Rosa, Argentina (missing jump)
+stationname = 'MZAE'; % Santa Rosa, Argentina (missing jump)
 % stationname = 'NEIL'; % Ciudad Neilly, Costa Rica
 % stationname = 'RWSN'; % Rawson, Argentina
 % stationname = 'PBJP'; %
@@ -59,6 +59,9 @@ P = [];
 P(1) = 1;
 P(2) = 1/2;
 % P(3) = 10;
+
+% convert oscillations to angular velocity
+W = 2 * pi ./ P;
 
 % Parameter T in [years] for computation of logarithmic transient for
 % earthquake events (jumps)
@@ -127,32 +130,20 @@ VisualizeTS_ENU2(data, dataSTATION_NAME, currStationJumps{:, 2}, ...
 t = data{:, 't'}; % [seconds]; for years, do /(365.25 * 86400);
 t0 = data{1, 'date'}; % beginning of ts as datetime
 
-% convert oscillations to angular velocity
-W = 2 * pi ./ P;
-
 %% Jump table
 HJumps = getRelativeJumps(currStationJumps{:, 2}, t0);
 
 % Distinguish between EQs (invokes log. transient) and other jumps (unknown cause or HW
 % change -> do not invoke transient)
 EQLogical = logical(currStationJumps{:, 4}); % 1:=earthquake; ~1:=no earthquake
-% Get Earthquake U
-EQJump = getRelativeJumps_eq(currStationJumps{:, 2}, t0, EQLogical2); 
+% Get Earthquake Jump Vector - Those Jumps will invoke a log. transient
+EQJump = getRelativeJumps_eq(currStationJumps{:, 2}, t0, EQLogical); 
 
 %% Add ITRF Realization Change Jumps
-% format yyyy-MM-dd, 
-ditrf(1) = datetime('2011-04-17', 'InputFormat', 'yyyy-MM-dd', 'TimeZone', 'UTC');
-ditrf(2) = datetime('2017-01-29', 'InputFormat', 'yyyy-MM-dd', 'TimeZone', 'UTC');
-% can be extended! keep format "yyyy-MM-dd", time will be 0:00am)
-
-if doITRFjump   
+if doITRFjump
     fprintf('Considering ITRF jumps, doITRFjump is set to "true".\n')
-    jumps0itrf = etime(datevec(ditrf), ...
-        datevec(repmat(t0, size(ditrf, 1), 1)));
-    % remove negative values -> itrf jumps BEFORE Time Series starts
-    jumps0itrf = jumps0itrf(jumps0itrf >= 0);
-    % convert jump times to years (365.25!!!! days) and sort asc
-    jumps0itrf = sort(jumps0itrf);% ./(365.25 * 86400));
+    
+    jumps0itrf = getRelativeITRFJumps(t0, itrf_changes_textfile);
     
     % append to heaviside jumps vector
     HJumps = [HJumps; jumps0itrf]; % HeavisideJump
@@ -315,7 +306,7 @@ VisualizeTS_Trend_Outliers_ITRF_ENU(data{:, 'date'}, ...
     titleString, ...
     OUTLIERLOGICAL, ...
     currStationJumps, ...
-    ditrf);
+    readITRFChanges(itrf_changes_textfile));
 % set(gcf, 'InnerPosition', [0 0 604 513]);
 set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
 

@@ -8,20 +8,24 @@ function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, nPolyn, w, 
 % jt: vector containing jump indices in [SECONDS] relative to t0 (if not specified -> empty)
 % eqjt: vector containing jump indices for earthquakes in [SECONDS] relative to t0 (if not specified -> empty)
 % T: Logarithmic Transient Parameter in [YEARS], will be set to 1 if not specified
-% (Note: t0 is
-% -> the following parameter definitions were moved outside of the function
-% to main.
+% (Note: t0 refers to the datetime of the first observation)
+% KK: number of iterations for IRLS
+% p: L_p Norm for IRLS. p=2 equals to the euclidean norm or L2. 
+% If p=2, no reweighting will be applied, independent of the number of iterations KK
+% outl_factor: median(error)|mean(error) + standard deviation * factor -> outlier
+
 if nargin <= 7
     % Additional Parameters (default values)
     KK = 0; % n of iterations for IRLS
     p = 2.0; % L_p Norm for IRLS
     outl_factor = 4; % median(error) + standard deviation * factor -> outlier
+    fprintf('No IRLS parameters defined. Calculating L2 norm LSE.\n')
 end
 
 fprintf('n of iterations for IRLS = %d,\np of L_p Norm for IRLS = %.2f,\nOutlier Factor = %d (median of error + standard deviation * factor < outlier)\n', ...
     KK, p, outl_factor);
 
-if nargin == 6
+if nargin == 6 || nargin == 9
     T = 1; % assign default value 1y for logar. transient parameter T
 end
 
@@ -120,10 +124,13 @@ if nnz(outlierLogical) > 0
 end  
 
 %% (3) IRLS - weight optimization
+% to prevent unwanted behaviour when computing trends for TS with multiple
+% jumps close to each other in time, use the xEst parameters for jumps to
+% cor
 % (IRLS: Iterative Reweighted Least Squares, C.Sidney Burrus)
 w_i = ones(size(b, 1), 1);
 
-% compute WEIGHTED RMS and RMS error -> store in result cell
+% compute WEIGHTED RMS and RMS error
 error_pnorm = norm(e, p);
 
 % wrmse_ = sqrt(1/nData * sum(w_i .* (b - A * xEst).^2));
