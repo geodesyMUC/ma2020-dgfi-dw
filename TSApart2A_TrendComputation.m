@@ -18,10 +18,6 @@
 %           Unknown = 0 (no unknown cause) or 1 (unknown cause)
 %           Use = 0 (dont use this jump) or 1 (use this jump)
 %
-%   Disclaimer: Certain parameters for the (Iteratively Reweighted) Least
-%   Squares can be adjusted in the corresponding function file
-%   ("computeTrendIRLS.mat")
-
 % David Wallinger, DGFI, 5.8.2019
 
 clear variables;
@@ -126,7 +122,6 @@ VisualizeTS_ENU2(data, dataSTATION_NAME, currStationJumps{:, 2}, ...
     'jumpTypes', currStationJumps{:, 4:5});
 
 %% PREPARE PARAMETERS FOR TREND ESTIMATION
-% reason: Numerical Stability in LSE matrix inversion
 t = data{:, 't'}; % [seconds]; for years, do /(365.25 * 86400);
 t0 = data{1, 'date'}; % beginning of ts as datetime
 
@@ -151,10 +146,6 @@ else
     fprintf('Not considering ITRF jumps, doITRFjump is set to "false".\n')
 end
 
-%% 
-
-
-
 %% Prepare Trend Estimation
 % preallocate arrays ---
 result_parameters = cell(3, 2);
@@ -167,37 +158,11 @@ dateIntvlN = length(dateIntvl);
 trenddata = zeros(dateIntvlN, 3);
 %---
 
-% Write Input Parameters to log file
-fprintf(fID, 'TSA: Trend for Station "%s" -----------\n', stationname);
-fprintf(fID, 'Time Series Start t0  = %s\n\n', datestr(t0, 'yyyy-mm-dd HH:MM'));
+%% Write Input Parameters to log file
 
-fprintf(fID, '\n### INPUT PARAMETERS ###\n');
+writeInputLog(fID, stationname, data{:, 'date'}, ...
+    polynDeg, P, HJumps, EQJump, KK, p, outl_factor);
 
-fprintf(fID, 'Polynomial Trend Model (SLTM):\nDegree = %d\n\n', polynDeg) ;
-fprintf(fID, 'Oscillations:\n%s\n\n', ...
-    sprintf('w(%d) = %.1f y | %.2f d\n', [(1:length(P)); P; P.*365.25]));
-% All jumps
-fprintf(fID, 'Jump table (Heaviside):\n');
-for i = 1:length(HJumps)
-    % Print Jump Datetime Information
-    fprintf(fID, 'J(%d) = t0 + %.2f y | %s\n', i, HJumps(i), ...
-        datestr(t0 + seconds(HJumps(i)), 'yyyy-mm-dd HH:MM'));
-end
-
-% EQ
-fprintf(fID, '\nEarthquake Jump table (Heaviside + Logarithmic Transient):\n');
-for i = 1:length(EQJump)
-    % Print Jump Datetime Information
-    fprintf(fID, 'J(%d) = t0 + %.2f y | %s\n', i, EQJump(i), ...
-        datestr(t0 + seconds(EQJump(i)), 'yyyy-mm-dd HH:MM'));
-end
-% LSE/IRLSE
-fprintf(fID, ['\nIRLSE/LSE Parameters:\nKK = %d (n of Iterations in IRLSE)\np = %.1f (L_p Norm used for IRLS)\n', ...
-    'outl_factor = %d (median of error + standard deviation * factor < outlier)\n'], KK, p, outl_factor);
-
-
-fprintf(fID, '\n### LEAST SQUARE ESTIMATION ###\n');
-fprintf(fID, 'Using Moore-Penrose pseudoinverse for Inversion of normal equation matrix when needed\n');
 % other variables - get count of unknowns for each type (poly, osc, jumps,
 % transients)
 nPolynTerms = polynDeg + 1; % 0, 1, 2, ... 
@@ -205,10 +170,7 @@ nOscParam = length(W) * 2; % cos & sin components (C, S) for every oscillation
 nJumps = length(HJumps); % All Jumps - From DB and ITRF (if set to true)
 nEQJumps = length(EQJump); % Only EQ Jumps -> n of transients
 
-%% Trend Estimation INCLUDING EQ Transients
-fprintf(fID, '\n### OUTPUT RESULTS ###\n');
-fprintf(fID, '-- Logarithmic Transients for Earthquakes estimated --\n\n');
-
+%% Trend Estimation
 for i = 1:3
     fprintf('Evaluating "%s" ...\n', coordinateSTR{i});
     [y, result_parameterC, xEst, outlierLogical] = computeTrendIRLS(...
@@ -229,37 +191,9 @@ for i = 1:3
     result_parameters{i, 2} = result_parameterC; % assign parameter cell to super cell
     OUTLIERLOGICAL{i} = outlierLogical; % 1: suspected outlier measurements, computed in IRLS function
     
-    % print stuff
-    strP = sprintf('p(%d) = %.5f | ', [1:nPolynTerms; xEst(1:nPolynTerms)']); % Polynomial Coefficients
-    if ~isempty(P)
-        strW = sprintf('w(%d): A = % .2fmm, C = % .2fmm,  S = % .2fmm\n', ...
-            [1:length(P); ...
-            sqrt(xEst(nPolynTerms + 1:2:nPolynTerms + nOscParam)'.^2 + ...
-            xEst(nPolynTerms + 2:2:nPolynTerms + nOscParam)'.^2); % Amplitude A
-            xEst(nPolynTerms + 1:2:nPolynTerms + nOscParam)'; ... % Oscillations C
-            xEst(nPolynTerms + 2:2:nPolynTerms + nOscParam)']); % Oscillations S
-    else
-        strW = 'None estimated';
-    end
-    if ~isempty(HJumps)
-        strH = sprintf('J(%d) = % .2fmm\n', [1:nJumps; ...
-            xEst(nPolynTerms + nOscParam + 1:nPolynTerms + nOscParam + nJumps)']); % Jumps
-    else
-        strH = 'None estimated';
-    end
-    if ~isempty(EQJump)
-        strEQ = sprintf('A(%d) = % .2fmm\n', [1:nEQJumps; ...
-            xEst(...
-            nPolynTerms + nOscParam + nJumps + 1:...
-            nPolynTerms + nOscParam + nJumps + nEQJumps)']); % EQ Jumps
-    else
-        strEQ = 'None estimated';
-    end
-    % Print all Parameters to log file
-    fprintf(fID, ['Estimated Parameters for %s:\nPolynomial Coefficients:\n%s\n', ...
-        'Oscillation Amplitudes:\n%s\nHeaviside Jumps:\n%s\nLogarithmic Transients:\n%s\nRoot Mean Square Error RSME = %.3fmm\n\n'], ...
-        coordinateSTR{i}, ...
-        strP, strW, strH, strEQ, result_parameterC{1, 2});
+    % print output parameters using custom function
+    writeOutputLog(fID, [stationname, '-', coordinateSTR{i}], xEst, ...
+        polynDeg, P, HJumps, EQJump, result_parameterC{1, 2}, result_parameterC{2, 2})
 end
 
 fprintf('Calculation finished.\nPlotting and writing results ...\n')
@@ -302,7 +236,8 @@ end
 figure
 VisualizeTS_Trend_Outliers_ITRF_ENU(data{:, 'date'}, ...
     [data{:, 'E'}, data{:, 'N'}, data{:, 'U'}], ...
-    dateIntvl, trenddata, ...
+    dateIntvl, ...
+    trenddata, ...
     titleString, ...
     OUTLIERLOGICAL, ...
     currStationJumps, ...
@@ -310,8 +245,7 @@ VisualizeTS_Trend_Outliers_ITRF_ENU(data{:, 'date'}, ...
 % set(gcf, 'InnerPosition', [0 0 604 513]);
 set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
 
-% close log file
-fclose(fID);
+fclose(fID); % close log file
 fprintf('Done!\n')
 
 % close all
