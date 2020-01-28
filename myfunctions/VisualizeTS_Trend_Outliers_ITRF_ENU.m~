@@ -8,7 +8,7 @@ function VisualizeTS_Trend_Outliers_ITRF_ENU(t_obs, obs, obs_outlier_logical, ob
 %   (n x m) obs_outlier_logical: logical for time series where 1:=outlier
 %           and 0:=no outlier.
 %   {1 x m} obs_names: name strings of time series observations, i.e. East,
-%           North, Up. This is used in plot legend.
+%           North, Up.
 %   (1 x n) t_trend: datetime vector of computed trends
 %   (n x m) trends: computed trends. m denotes the number of different time
 %           series, i.e. E, N and U.
@@ -17,13 +17,7 @@ function VisualizeTS_Trend_Outliers_ITRF_ENU(t_obs, obs, obs_outlier_logical, ob
 %   (u x v) jump_categories_logical: array where row u = jump(u) and column
 %           v = jump category(v). 1:=this jump (row) belongs to this 
 %           category (column).
-%   {1 x v} jump_categories_names: name of all categories, used in plot
-%           legend.
-%   (i x 1) jumpITRF: datetime vector of itrf jumps
-%
-%   OUTPUT:
-%       Plot (Subplots when more than 1 time series component)
-
+%   {1 x v} jump_categories_names:
 n_components = size(obs, 2); % number of trend components
 
 %% Create subplots for every coordinate component
