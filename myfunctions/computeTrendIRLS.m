@@ -1,4 +1,4 @@
-function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, nPolyn, w, jt, eqjt, T, KK, p, outl_factor)
+function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, nPolyn, W, jt, eqjt, T, KK, p, outl_factor)
 % IRLSE - 
 % INPUT
 %   x: vector containing time stamps in [SECONDS] relative to t0
@@ -37,7 +37,7 @@ eqjt = eqjt./(365.25 * 86400);
 % parameter counts
 nData = length(x); % number of measurements
 nPolynTerms = nPolyn + 1; % 0, 1, 2, ... 
-nPeriodic = length(w); % oscillations
+nPeriodic = length(W); % oscillations
 nPeriodicCoeff = nPeriodic * 2; % cos & sin components (C, S) for every oscillation
 nJumps = length(jt); % All Jumps - From DB and ITRF (if set to true)
 nEqJumps = length(eqjt); % number of eq jumps -> transient
@@ -61,8 +61,8 @@ end
 % 2:OSCILLATION MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 cnt = 0; % counter for periodic coefficients
 
-for i = 1:length(w)
-    A(:, N(2) +  1 + cnt:N(2) +  cnt + 2) = [cos(x * w(i)), sin(x * w(i))];
+for i = 1:length(W)
+    A(:, N(2) +  1 + cnt:N(2) +  cnt + 2) = [cos(x * W(i)), sin(x * W(i))];
     cnt = cnt + 2; % increment to match coefficients
 end
 
@@ -83,46 +83,23 @@ end
 
 %% (1) Calculate initial parameters xEst from A, b
 
-% % Option 1 -----
-% Nmat = A'*A; % normal equations
-% n = A'*b;
-% xEst = Nmat\A'*b;
-
-% % Option 2 ----- Pseudoinverse (Penrose-Moore)
-% Nmat = A'*A; % normal equations
-% n = A' * b;
-% xEst = pinv(Nmat) * n;
-
-% Option 3 --- Use Function
-xEst = lsqInvMMult(A' * A, A' * b);
+[xEst, e] = computeLeastSquares(A, b);
 
 %% (2) Detect & Remove outliers
-e = A * xEst - b; % Error vector
 
 % check if outliers are present
-outlierLogical = abs(e) > median(e) + std(e) * outl_factor; % Logical with outliers
+outlierLogical = abs(e) > mean(e) + std(e) * outl_factor; % Logical with outliers
 
 % if so, then remove outliers and compute LSE one more time
 if nnz(outlierLogical) > 0
-    b(outlierLogical) = []; % remove them from measurements
-    A(outlierLogical, :) = []; % remove them from design matrix
-    
-    % Option 1 -----
-    % Nmat = A'*A; % normal equations
-    % n = A'*b;
-    % xEst = Nmat\A'*b;
-    
-    % % Option 2 ----- Pseudoinverse (Penrose-Moore)
-    % xEst = pinv(Nmat)* A'* b;
-    
-    % Option 3 --- Use Function
-    xEst = lsqInvMMult(A' * A, A' * b);
-    
-    % update error vector
-    e = A * xEst - b;
-    % update nData
-    nData = length(b);
+    b(outlierLogical) = []; % remove them from observation vector b
+    A(outlierLogical, :) = []; % remove them from design matrix A
+    % LS one more time
+    [xEst, e] = computeLeastSquares(A, b);
 end  
+
+rms = computeRMS(A, b, xEst);
+wrms = computeWRMS(A, b, xEst, eye(length(b))); % weights 1 (diag matrix)
 
 %% (3) IRLS - weight optimization
 % to prevent unwanted behaviour when computing trends for TS with multiple
@@ -131,72 +108,35 @@ end
 
 % WORK IN PROGRESS @27.1.2020
 
-% (IRLS: Iterative Reweighted Least Squares, C.Sidney Burrus)
-w_i = ones(size(b, 1), 1);
-
-% compute WEIGHTED RMS and RMS error
-error_pnorm = norm(e, p);
-
-% wrmse_ = sqrt(1/nData * sum(w_i .* (b - A * xEst).^2));
-wrmse_ = sqrt(sum(w_i .* (b - A * xEst).^2)/sum(w_i));
-rmse_ = sqrt(1/nData * sum((b - A * xEst).^2));
-
 % debugging/irls algorithm monitoring values %%%%%%%%%%%%%%%%%%%%%%
 E = [];
-RMS_ = [rmse_];
-WRMS_ = [wrmse_];
+RMS_vector = [rms];
+WRMS_vector = [wrms];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 for k = 1:KK
     
     fprintf('IRLS Iteration #%d\n', k);
-    e = A * xEst - b; % Error vector
     e(e==0) = 0.0001; % add small value to 0, so div by 0 is prevented
-    w_i = abs(e).^((p - 2)/2); % compute Error weights w(i) with /2
-    denom_p = max(sum(w_i), 0.001); % Pick maximum to prevent zero denominator for new w(i)
-    Wmat = diag(w_i/denom_p); % Normalized weight matrix
-    
-%     % Using Moore Penrose Pseudoinverse with tolerance
-%     xEst3 = pinv(A' * Wmat * A, 0.001) * A' * Wmat * b; % Weighted LSE equation
-
-%     % Using Moore Penrose Pseudoinverse
-%     xEst2 = pinv(A' * Wmat * A) * A' * Wmat * b; % Weighted LSE equation
-
-%     % Using \
-%     xEst = A' * Wmat * A \ A' * Wmat * b; % Weighted LSE equation
-
-    % use custom Function for MMult
-    % if matrix is close to being singular (inversion possibly not
-    % possible), the pseudoinverse is used to do the matrix multiplication
-    WA = Wmat * A;
-    N_ = WA' * WA;
-%     N_ = A' * Wmat * A;
-    
-    if nnz(isnan(N_))
-        error('error: matrix N = transp(A) * Wmat * A contains NaN') % Test: if matrix contains NaN -> Abort
-    end
-    
-%     xEst_  = lsqInvMMult(A' * Wmat * A, A' * Wmat * b); % old
-    xEst = lsqInvMMult(WA' * WA, (WA' * Wmat) * b);
+    [xEst, e, w] = computeWeightedLeastSquares(A, b, e, p);
     
     %% Error each iteration (Used for Debugging/Monitoring iterative procedure)
-    ee = norm(e, p); % error at each iteration
-    E = [E ee];
+    pNorm = norm(e, p); % error at each iteration
+    E = [E pNorm];
     
-    wrms_ = sqrt(sum(w_i .* (b - A * xEst).^2)/sum(w_i));
-    rms_ = sqrt(1/nData * sum((b - A * xEst).^2));
+    rms = computeRMS(A, b, xEst);
+    wrms = computeWRMS(A, b, xEst, w); % weights 1 (diag matrix)
     
-    RMS_ = [RMS_ rms_];
-    WRMS_ = [WRMS_ wrms_];
+    RMS_vector = [RMS_vector rms]; % append
+    WRMS_vector = [WRMS_vector wrms]; % append
     
 end
 
-
 %% (4) QA Plots & Stats
 figure
-plot(0:KK, RMS_, 'bx-')
+plot(0:KK, RMS_vector, 'bx-')
 hold on
-plot(0:KK, WRMS_, 'mx-')
+plot(0:KK, WRMS_vector, 'mx-')
 grid on
 title('rms/wrms error')
 xlabel('# Iteration ->')
@@ -209,16 +149,13 @@ title(sprintf('irls error: p norm (p=%.1f)', p))
 ylabel('p norm [mm]')
 xlabel('# Iteration ->')
 
-% compute WEIGHTED RMS and RMS error -> store in result cell
-wrmse = sqrt(sum(w_i .* (b - A * xEst).^2)/sum(w_i));
-rmse = sqrt(1/nData * sum((b - A * xEst).^2));
-
+% get rms and wrms into result cell for output
 results{1, 1} = 'rms';
-results{1, 2} = rmse;
+results{1, 2} = rms;
 results{2, 1} = 'wrms';
-results{2, 2} = wrmse;
+results{2, 2} = wrms;
 
-fprintf('WMRS = %.4f, RMS = %.4f\n', wrmse, rmse);
+fprintf('WMRS = %.4f, RMS = %.4f\n', wrms, rms);
 
 %% (5) sample equidistant values for TIME
 % -> for time series with LSE estimated parameters
@@ -243,8 +180,75 @@ xSim = x(1):1/365.25:x(end); % 1d
 
 % call function
 % creates y values (e.g. up values) for "simulated" time series
-y = TimeFunction(xSim, polynParam, periodicParam, w, jt, jumpParam, ...
+y = TimeFunction(xSim, polynParam, periodicParam, W, jt, jumpParam, ...
     eqjt, EQtransient);
+end
+
+%% IRLS Custom Functions
+function [xEst, e] = computeLeastSquares(A, b)
+% Calculate parameters xEst and error vector e from A, b
+
+% % Option 1 -----
+% Nmat = A'*A; % normal equations
+% n = A'*b;
+% xEst = Nmat\A'*b;
+
+% Option 2 ----- Pseudoinverse (Penrose-Moore)
+Nmat = A' * A; % normal equations
+n = A' * b;
+xEst = pinv(Nmat) * n;
+
+% % Option 3 --- Use Function
+% xEst = lsqInvMMult(A' * A, A' * b);
+
+% Detect & Remove outliers
+e = A * xEst - b; % Error vector
+
+end
+
+function [xEst, e, w_i] = computeWeightedLeastSquares(A, b, e_t0, p)
+% Calculate parameters xEst and error vector e from A, b, p and the
+% previous error vector e_t0
+
+w_i_ = abs(e_t0).^((p - 2)/2); % compute Error weights w(i) with /2 [Burrows]
+w_i = abs(e_t0).^(p - 2); % compute Error weights w(i) [Wikipedia]
+denom_p = max(sum(w_i), 0.001); % Pick maximum to prevent zero denominator for new w(i)
+Wmat = diag(w_i/denom_p); % Normalized weight matrix
+
+% % Using Moore Penrose Pseudoinverse with tolerance
+% xEst3 = pinv(A' * Wmat * A, 0.001) * A' * Wmat * b; % Weighted LSE equation
+% 
+% % Using Moore Penrose Pseudoinverse
+% xEst2 = pinv(A' * Wmat * A) * A' * Wmat * b; % Weighted LSE equation
+% 
+% % Using \
+% xEst = A' * Wmat * A \ A' * Wmat * b; % Weighted LSE equation
+
+Nmat = A' * Wmat * A; % normal equations
+n = A' * Wmat * b;
+
+WA = Wmat * A; % [Burrows]
+N_ = WA' * WA; % [Burrows]
+if nnz(isnan(N_))
+    error('error: matrix N = transp(A) * Wmat * A contains NaN.') % Test: if matrix contains NaN -> Abort
+end
+xEst_ = pinv(N_) * (WA' * Wmat) * b;
+% xEst_ = lsqInvMMult(N_, (WA' * Wmat) * b); % [Burrows] % Alternative: Use Function
+
+xEst = pinv(Nmat) * n;
+% xEst = lsqInvMMult(A' * A, A' * b); % Alternative: Use Function
+
+e = A * xEst - b; % Error vector
+
+end
+
+function [rms] = computeRMS(A, b, xEst)
+nData = length(b); % number of observations
+rms = sqrt(1/nData * sum((b - A * xEst).^2)); % root mean square
+end
+
+function [wrms] = computeWRMS(A, b, xEst, w_i)
+wrms = sqrt(sum(w_i .* (b - A * xEst).^2)/sum(w_i)); % weighted root mean square
 end
 
 function x = lsqInvMMult(A, B)
@@ -252,7 +256,7 @@ function x = lsqInvMMult(A, B)
 warning('error', 'MATLAB:nearlySingularMatrix');
 warning('error', 'MATLAB:singularMatrix');
 
-try 
+try
     x = A \ B;
 catch
     % Using Moore Penrose Pseudoinverse with tolerance
