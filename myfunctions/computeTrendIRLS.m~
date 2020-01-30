@@ -1,18 +1,18 @@
 function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, nPolyn, w, jt, eqjt, T, KK, p, outl_factor)
-% LSE
+% IRLSE - 
 % INPUT
-% x: vector containing time stamps in [SECONDS] relative to t0
-% b: vector containing observations
-% degree: integer power of polynome denoting station velocity
-% w: vector containing periods in [RAD]
-% jt: vector containing jump indices in [SECONDS] relative to t0 (if not specified -> empty)
-% eqjt: vector containing jump indices for earthquakes in [SECONDS] relative to t0 (if not specified -> empty)
-% T: Logarithmic Transient Parameter in [YEARS], will be set to 1 if not specified
-% (Note: t0 refers to the datetime of the first observation)
-% KK: number of iterations for IRLS
-% p: L_p Norm for IRLS. p=2 equals to the euclidean norm or L2. 
-% If p=2, no reweighting will be applied, independent of the number of iterations KK
-% outl_factor: median(error)|mean(error) + standard deviation * factor -> outlier
+%   x: vector containing time stamps in [SECONDS] relative to t0
+%   b: vector containing observations
+%   nPolyn: integer power of polynome denoting station velocity
+%   w: vector containing periods in [RAD]
+%   jt: vector containing jump times in [SECONDS] relative to t0 (if not specified -> empty)
+%   eqjt: vector containing jump times for earthquakes in [SECONDS] relative to t0 (if not specified -> empty)
+%   (Note: t0 refers to the datetime of the first observation in the time series)
+%   T: Logarithmic Transient Parameter in [YEARS], will be set to 1 if not specified
+%   KK: number of iterations for IRLS
+%   p: L_p Norm for IRLS. p=2 equals to the euclidean norm (=L2). 
+%   If p=2, no reweighting will be applied, independent of the number of iterations KK
+%   outl_factor: median(error)|mean(error) + standard deviation * factor -> outlier
 
 if nargin <= 7
     % Additional Parameters (default values)
@@ -117,6 +117,7 @@ if nnz(outlierLogical) > 0
     
     % Option 3 --- Use Function
     xEst = lsqInvMMult(A' * A, A' * b);
+    
     % update error vector
     e = A * xEst - b;
     % update nData
@@ -125,8 +126,11 @@ end
 
 %% (3) IRLS - weight optimization
 % to prevent unwanted behaviour when computing trends for TS with multiple
-% jumps close to each other in time, use the xEst parameters for jumps to
-% cor
+% jumps close to each other in time, apply the xEst parameters for jumps to
+% trend, then compute new xEst
+
+% WORK IN PROGRESS @27.1.2020
+
 % (IRLS: Iterative Reweighted Least Squares, C.Sidney Burrus)
 w_i = ones(size(b, 1), 1);
 
@@ -235,7 +239,7 @@ jumpParam = xEst(N(3) + 1:N(4));
 EQtransient = xEst(N(4) + 1:N(5));
 
 % "simulated" time series (equally spaced, depending on time interval)
-xSim = x(1):1/365.25:x(end); 
+xSim = x(1)::x(end); % 1d
 
 % call function
 % creates y values (e.g. up values) for "simulated" time series
@@ -252,6 +256,7 @@ try
     x = A \ B;
 catch
     % Using Moore Penrose Pseudoinverse with tolerance
+    fprintf('Using Moore-Penrose pseudoinverse for Inversion of normal equation matrix.\n');
     x = pinv(A, 0.001) * B;
 end
 end

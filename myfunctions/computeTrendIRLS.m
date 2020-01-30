@@ -239,7 +239,7 @@ jumpParam = xEst(N(3) + 1:N(4));
 EQtransient = xEst(N(4) + 1:N(5));
 
 % "simulated" time series (equally spaced, depending on time interval)
-xSim = x(1):1/365.25:x(end); 
+xSim = x(1):1/365.25:x(end); % 1d
 
 % call function
 % creates y values (e.g. up values) for "simulated" time series
