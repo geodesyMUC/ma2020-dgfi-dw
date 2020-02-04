@@ -25,7 +25,6 @@ close all;
 addpath('myfunctions')
 
 %% SETTINGS (adapt if necessary) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 %%% INPUT data settings %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 inputFolder = 'station_data'; % Where Station Data (TSA_ReadAndTransform) is stored as ".mat"
 jumpCSVLocation = 'jumps_version3.csv'; % Location of Jump Table/Jump Database
@@ -69,7 +68,7 @@ doITRFjump = true; % E - N - U
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
 KK = 10; % n of iterations for IRLS
 p = 1.5; % L_p Norm for IRLS
-outl_factor = 5; % median(error) + standard deviation * factor -> outlier
+outl_factor = 4; % median(error) + standard deviation * factor -> outlier
 
 %%% Output %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 logFileFolder = 'TSA_TrendComputationResults'; % output: log file directory
@@ -148,19 +147,17 @@ else
 end
 
 %% Prepare Trend Estimation
-% preallocate arrays ---
+% preallocate cell arrays
 result_parameters = cell(3, 2);
 outlier_logicals = cell(3, 1);
-% create array with equal date intervals (1d)
+% create datetime array with equal date intervals (1d)
 % % dateIntvl =  data{:, 'date'}; % verify integrity of algorithm COMMENT
 dateIntvl =  data{1, 'date'}:days(1):data{end, 'date'}; %
 % n of intervals (ie days)
 dateIntvlN = length(dateIntvl);
 trenddata = zeros(dateIntvlN, 3);
-%---
 
 %% Write Input Parameters to log file
-
 writeInputLog(fID, stationname, data{:, 'date'}, ...
     polynDeg, P, HJumps, EQJump, KK, p, outl_factor);
 
@@ -197,7 +194,6 @@ for i = 1:3
         polynDeg, P, HJumps, EQJump, result_parameterC{1, 2}, result_parameterC{2, 2})
 end
 fclose(fID); % close log file
-
 fprintf('Calculation finished.\nPlotting and writing results ...\n')
 
 %% Write Trend Results to file

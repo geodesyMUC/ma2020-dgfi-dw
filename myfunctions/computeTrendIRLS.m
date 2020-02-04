@@ -30,12 +30,12 @@ if nargin == 6 || nargin == 9
 end
 
 % convert datetimes to from [seconds] to [years]
-x = x./(365.25 * 86400);
-jt = jt./(365.25 * 86400);
-eqjt = eqjt./(365.25 * 86400);
+x = years(seconds(x));       % x./(365.25 * 86400);
+jt = years(seconds(jt));      % jt./(365.25 * 86400);
+eqjt = years(seconds(eqjt));    % eqjt./(365.25 * 86400);
 
 % parameter counts
-nData = length(x); % number of measurements
+nData = length(x); % number of observations
 nPolynTerms = nPolyn + 1; % 0, 1, 2, ... 
 nPeriodic = length(W); % oscillations
 nPeriodicCoeff = nPeriodic * 2; % cos & sin components (C, S) for every oscillation
@@ -176,7 +176,7 @@ jumpParam = xEst(N(3) + 1:N(4));
 EQtransient = xEst(N(4) + 1:N(5));
 
 % "simulated" time series (equally spaced, depending on time interval)
-xSim = x(1):1/365.25:x(end); % 1d
+xSim = x(1):years(days(1)):x(end); % 1d
 
 % call function
 % creates y values (e.g. up values) for "simulated" time series
