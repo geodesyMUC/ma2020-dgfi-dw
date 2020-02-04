@@ -74,7 +74,7 @@ for i = 1:nStations
     save(filepath1, 'currStation');
     
     % Create TS Print (image)
-    % Visualize_ENU_TS function needed!
+    % VisualizeTS_ENU function needed!
     figTS = figure('visible','off');
     VisualizeTS_ENU(currStation.Data, currStation.Station);
     

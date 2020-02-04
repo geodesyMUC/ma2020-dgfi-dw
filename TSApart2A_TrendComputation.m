@@ -26,9 +26,14 @@ addpath('myfunctions')
 
 %% SETTINGS (adapt if necessary) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% INPUT data settings %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-inputFolder = 'station_data'; % Where Station Data (TSA_ReadAndTransform) is stored as ".mat"
-jumpCSVLocation = 'jumps_version3.csv'; % Location of Jump Table/Jump Database
-itrf_changes_textfile = 'itrf_changes.txt';
+% inputFolder = 'station_data'; % Where Station Data (TSA_ReadAndTransform) is stored as ".mat"
+% jumpCSVLocation = 'src/jumps_version3.csv'; % Location of Jump Table/Jump Database
+% itrf_changes_textfile = 'src/itrf_changes.txt';
+
+inputFolder = 'station_data_dailyXYZfiles'; % Where Station Data (TSA_ReadAndTransform) is stored as ".mat"
+jumpCSVLocation = 'src/jumps_dailyXYZfiles.csv'; % Location of Jump Table/Jump Database
+itrf_changes_textfile = 'src/itrf_changes.txt';
+
 %%% Name of station to be analysed %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SELECTION FOR ANALYSIS
 
@@ -38,10 +43,13 @@ itrf_changes_textfile = 'itrf_changes.txt';
 % stationname = 'CONZ'; % Concepcion, Chile
 % stationname = 'OAX2'; % Oaxaca, Mexico
 % stationname = 'CUEC'; % Cuenca, Ecuador
-stationname = 'MZAE'; % Santa Rosa, Argentina (missing jump)
+% stationname = 'MZAE'; % Santa Rosa, Argentina (missing jump)
 % stationname = 'NEIL'; % Ciudad Neilly, Costa Rica
 % stationname = 'RWSN'; % Rawson, Argentina
-% stationname = 'PBJP'; %
+% stationname = 'PBJP';
+
+% stationname = '21701S007A03'; % KSMV
+stationname = '21702M002A07'; % MIZU
 
 %%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Polynomial Trend: Degree
@@ -51,8 +59,8 @@ polynDeg = 1; % integer degree number
 
 % periods / oscillations in YEARS (=365.25 days) in vector form
 P = [];
-P(1) = 1;
-P(2) = 1/2;
+% P(1) = 1;
+% P(2) = 1/2;
 % P(3) = 10;
 
 % convert oscillations to angular velocity
@@ -63,11 +71,11 @@ W = 2 * pi ./ P;
 T = 1;
 
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
-doITRFjump = true; % E - N - U
+doITRFjump = false; % E - N - U
 
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
-KK = 10; % n of iterations for IRLS
-p = 1.5; % L_p Norm for IRLS
+KK = 0; % n of iterations for IRLS
+p = 2.0; % L_p Norm for IRLS
 outl_factor = 4; % median(error) + standard deviation * factor -> outlier
 
 %%% Output %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -240,7 +248,6 @@ VisualizeTS_Trend_Outliers_ITRF_ENU(...
 
 % set(gcf, 'InnerPosition', [0 0 604 513]);
 set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
-
 fprintf('Done!\n')
 
 % close all

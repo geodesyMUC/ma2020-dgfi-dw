@@ -100,13 +100,21 @@ end
 
 % Convert the contents of columns with dates to MATLAB datetimes using the
 % specified date format.
+if length(dataArray{2}{2}) == 10
+    % assume yyyy-MM-dd
+    date_format_str = 'yyyy-MM-dd';
+elseif length(dataArray{2}{2}) == 19
+    % assume yyyy-MM-dd HH:mm:ss
+    date_format_str = 'yyyy-MM-dd HH:mm:ss';
+end
+fprintf('Using "%s" format for import of jump datetimes.\n', date_format_str);
 try
-    dates{2} = datetime(dataArray{2}, 'Format', 'yyyy-MM-dd', 'InputFormat', 'yyyy-MM-dd', 'TimeZone', 'UTC');
+    dates{2} = datetime(dataArray{2}, 'Format', date_format_str, 'InputFormat', date_format_str, 'TimeZone', 'UTC');
 catch
     try
         % Handle dates surrounded by quotes
         dataArray{2} = cellfun(@(x) x(2:end-1), dataArray{2}, 'UniformOutput', false);
-        dates{2} = datetime(dataArray{2}, 'Format', 'yyyy-MM-dd', 'InputFormat', 'yyyy-MM-dd', 'TimeZone', 'UTC');
+        dates{2} = datetime(dataArray{2}, 'Format', date_format_str, 'InputFormat', date_format_str, 'TimeZone', 'UTC');
     catch
         dates{2} = repmat(datetime([NaN NaN NaN]), size(dataArray{2}));
     end
