@@ -49,7 +49,13 @@ itrf_changes_textfile = 'src/itrf_changes.txt';
 % stationname = 'PBJP';
 
 % stationname = '21701S007A03'; % KSMV
-stationname = '21702M002A07'; % MIZU
+% stationname = '21702M002A07'; % MIZU
+% stationname = '21729S007A04'; % USUDA
+% stationname = '21754S001A01'; % P-Okushiri - Hokkaido
+% stationname = '21778S001A01'; % P-Kushiro - Hokkaido
+% stationname = '23104M001A01'; % Medan (North Sumatra)
+% stationname = '41705M003A04'; % Santiago
+stationname = '41719M004A02'; % Concepcion
 
 %%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Polynomial Trend: Degree
@@ -68,7 +74,7 @@ W = 2 * pi ./ P;
 
 % Parameter T in [years] for computation of logarithmic transient for
 % earthquake events (jumps)
-T = 1;
+T = 1.0;
 
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
 doITRFjump = false; % E - N - U
@@ -109,6 +115,7 @@ end
 % Reassign currStation variable
 data = currStation.Data;
 dataSTATION_NAME = currStation.Station;
+% data = sortrows(data, 1); % sort rows according to datetime column ASC
 
 % Load Jump Table using custom import function
 dataJump = importfileJumpCSV(jumpCSVLocation);
@@ -160,7 +167,7 @@ result_parameters = cell(3, 2);
 outlier_logicals = cell(3, 1);
 % create datetime array with equal date intervals (1d)
 % % dateIntvl =  data{:, 'date'}; % verify integrity of algorithm COMMENT
-dateIntvl =  data{1, 'date'}:days(1):data{end, 'date'}; %
+dateIntvl =  min(data{:, 'date'}):days(1):max(data{:, 'date'}); %
 % n of intervals (ie days)
 dateIntvlN = length(dateIntvl);
 trenddata = zeros(dateIntvlN, 3);

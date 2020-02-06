@@ -70,6 +70,8 @@ for i = 1:length(myFolder_content.x) % y or z can also be used
     VisualizeTS_ENU(currStation.Data, currStation.Station);
     saveas(figTS, fullfile(output_folder, ...
         [current_station_name, '-TSvis.png'])); % Save figure as image file
+    % Set CreateFcn callback
+    set(figTS, 'CreateFcn', 'set(gcbo,''Visible'',''on'')');
     saveas(figTS, fullfile(output_folder, ...
         [current_station_name, '-TSvis.fig'])); % Save figure as image file
     close(figTS)

@@ -22,7 +22,7 @@ if nargin <= 7
     fprintf('No IRLS parameters defined. Calculating L2 norm LSE.\n')
 end
 
-fprintf('n of iterations for IRLS = %d,\np of L_p Norm for IRLS = %.2f,\nOutlier Factor = %d (median of error + standard deviation * factor < outlier)\n', ...
+fprintf('n of iterations for IRLS = %d,\np of L_p Norm for IRLS = %.2f,\nOutlier Factor = %d (mean of error + standard deviation * factor < outlier)\n', ...
     KK, p, outl_factor);
 
 if nargin == 6 || nargin == 9
@@ -176,7 +176,7 @@ jumpParam = xEst(N(3) + 1:N(4));
 EQtransient = xEst(N(4) + 1:N(5));
 
 % "simulated" time series (equally spaced, depending on time interval)
-xSim = x(1):years(days(1)):x(end); % 1d
+xSim = min(x):years(days(1)):max(x); % 1d
 
 % call function
 % creates y values (e.g. up values) for "simulated" time series
