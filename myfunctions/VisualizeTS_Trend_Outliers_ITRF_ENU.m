@@ -25,6 +25,14 @@ function VisualizeTS_Trend_Outliers_ITRF_ENU(t_obs, obs, obs_outlier_logical, ob
 %       Plot (Subplots when more than 1 time series component)
 
 n_components = size(obs, 2); % number of trend components
+jump_color_map = [...
+    0, 204, 101; ...
+    153, 51, 255; ...
+    204, 0, 102; ...
+    204, 204, 0; ...
+    0, 204, 204; ...
+    255, 128, 0
+    ];
 
 %% Create subplots for every coordinate component
 for i = 1:n_components
@@ -81,7 +89,10 @@ for i = 1:n_components
     for n = 1:size(jump_categories_logical, 1) % All Jumps (=Rows)
         for c = 1:length(jump_categories_names) % All Categories (=Columns)
             if jump_categories_logical(n, c) % If this jumps fits to category
-                plotElement{c} = plot([t_jump(n); t_jump(n)], [y1; y2]); % plot jump
+                
+                plotElement{c} = plot([t_jump(n); t_jump(n)], [y1; y2], ... % plot jump
+                    'color', jump_color_map(c, :)./255); % use color from map
+                
                 if ~plotLogical(4 + c) % if category of this jump is still FALSE ...
                     % this has do be done only ONCE per category, else
                     % there will be duplicate legend entries
