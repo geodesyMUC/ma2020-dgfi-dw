@@ -56,13 +56,19 @@ for i = 1:length(myFolder_content.x) % y or z can also be used
         lon0, ... % Origin Longitude (use 1. obs)
         h0, ... % Origin Height (use 1. obs)
         spheroid, 'degrees'); % other parameters
+    
     % load as table, convert enu to [mm]
-    enu_table = table(d_t, t, E .* 1e3, N .* 1e3, U .* 1e3, ...
+    output_table = table(d_t, t, E .* 1e3, N .* 1e3, U .* 1e3, ...
     'VariableNames', ...
         {'date', 't', 'E', 'N', 'U'});
     
+%     output_table = table(d_t, t, (x-x(1)) .* 1e3, (y-y(1)) .* 1e3, (z-z(1)) .* 1e3, ...
+%     'VariableNames', ...
+%         {'date', 't', 'X', 'Y', 'Z'});
+    
     currStation.Station = current_station_name;
-    currStation.Data = enu_table;
+    currStation.Data = output_table;
+    
     % save output table
     save(fullfile(output_folder, [current_station_name, '.mat']), 'currStation');
     % create plot, save it

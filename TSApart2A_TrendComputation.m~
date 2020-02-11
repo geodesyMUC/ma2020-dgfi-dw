@@ -30,7 +30,7 @@ addpath('myfunctions')
 % jumpCSVLocation = 'src/jumps_version3.csv'; % Location of Jump Table/Jump Database
 % itrf_changes_textfile = 'src/itrf_changes.txt';
 
-inputFolder = 'station_data_dailyXYZfiles'; % Where Station Data (TSA_ReadAndTransform) is stored as ".mat"
+inputFolder = 'station_data_dailyXYZfiles_xyz'; % Where Station Data (TSA_ReadAndTransform) is stored as ".mat"
 jumpCSVLocation = 'src/jumps_dailyXYZfiles.csv'; % Location of Jump Table/Jump Database
 itrf_changes_textfile = 'src/itrf_changes.txt';
 
@@ -74,7 +74,7 @@ W = 2 * pi ./ P;
 
 % Parameter T in [years] for computation of logarithmic transient for
 % earthquake events (jumps)
-T = 1.00;
+T = 0.25;
 
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
 doITRFjump = false; % E - N - U
@@ -98,8 +98,8 @@ end
 fID = fopen(fullfile(logFileFolder, logFile), 'wt');
 
 % other variables (constants)
-coordinateSTR = {'E [mm]', 'N [mm]', 'U [mm]'}; % used to label plots
-% coordinateSTR = {'X [mm] rel. to x_1', 'Y [mm] rel. to y_1', 'Z [mm] rel. to z_1'}; % used to label plots
+% coordinateSTR = {'E [mm]', 'N [mm]', 'U [mm]'}; % used to label plots
+coordinateSTR = {'X [mm] rel. to x_1', 'Y [mm] rel. to y_1', 'Z [mm] rel. to z_1'}; % used to label plots
 
 jump_category_names = {'Earthquake', 'SW/HW-Change', 'Unknown'}; % corresponds to jump table columns
 
@@ -231,7 +231,7 @@ csvwrite(resultSaveFile, resultM); % R2006
 %% Visualize Results
 % set up title
 titleString = cell(3, 1);
-titleStringPattern = 'Station: %s - n of Obs.=%d - ITRF Jumps: %s - RMS = %.2fmm';
+titleStringPattern = 'Station: %s - n of Obs.=%d - ITRF Jumps: %s - RSME = %.2fmm';
 
 for i = 1:3 % for E N U respectively
     if doITRFjump == true

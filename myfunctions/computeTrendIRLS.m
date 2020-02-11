@@ -76,9 +76,10 @@ end
 % Calculate logarithmic transient for all earthquakes in this TS
 for i = 1:nEqJumps
     dt = x - eqjt(i);
-    dt(dt < 0) = 0; % Every observation BEFORE the eq event
+    dt(dt < 0) = 0; % Every observation BEFORE the event
     % Transient
-    A(:, N(4) + i) = log(1 + dt ./ T);
+    A(:, N(4) + i) = log(1 + dt ./ T); % logarithmic transient
+%     A(:, N(4) + i) = 1 - exp(-dt ./ T); % exponential transient
 end
 
 %% (1) Calculate initial parameters xEst from A, b
@@ -106,7 +107,7 @@ wrms = computeWRMS(A, b, xEst, eye(length(b))); % weights 1 (diag matrix)
 % jumps close to each other in time, apply the xEst parameters for jumps to
 % trend, then compute new xEst
 
-% WORK IN PROGRESS @27.1.2020
+% WORK IN PROGRESS @27.1.2020 (Update 2/2020 - doesnt occur anymore)
 
 % debugging/irls algorithm monitoring values %%%%%%%%%%%%%%%%%%%%%%
 E = [];
@@ -181,7 +182,7 @@ xSim = min(x):years(days(1)):max(x); % 1d
 % call function
 % creates y values (e.g. up values) for "simulated" time series
 y = TimeFunction(xSim, polynParam, periodicParam, W, jt, jumpParam, ...
-    eqjt, EQtransient);
+    eqjt, EQtransient, T);
 end
 
 %% IRLS Custom Functions
@@ -265,14 +266,15 @@ catch
 end
 end
 
-function Y = TimeFunction(x, pol, CS, w, jt, b, eqjt, a)
+function Y = TimeFunction(x, pol, CS, w, jt, b, eqjt, a, T)
 % Creates time series from estimated parameters
 % x: timestamps
 % pol: polynomial coeffiecients
 % CS: cos/sin periodic coefficients
 % w: vector containing periods (rad)
 % shift
-% logarithmic transient
+% amplitude of transient
+% relaxation time T
 
 pol_N = length(pol); % number of polynomial coeffiecients
 w_N = length(w); % number of periodic coefficients
@@ -301,12 +303,13 @@ for i = 1:jump_N
 end
 
 % transient terms
-T = 1; % T = 1y -> constant
+% T = 1; % T = 1y -> constant
 for i = 1:eq_N
     dt = x - eqjt(i);
     dt(dt < 0) = 0; % Every observation BEFORE the eq event
     % compute
-    yy(:, cnt) = a(i) * log(1 + dt ./ T);
+    yy(:, cnt) = a(i) * log(1 + dt ./ T); % logarithmic
+%     yy(:, cnt) = a(i) * (1 - exp(-dt ./ T)); % exponential
     % increment counter
     cnt = cnt + 1;
 end
