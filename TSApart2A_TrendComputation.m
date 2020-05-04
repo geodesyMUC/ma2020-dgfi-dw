@@ -187,8 +187,9 @@ nEQJumps = length(EQJump); % Only EQ Jumps -> n of transients
 
 %% Trend Estimation
 for i = 1:3
+    % 1st LSE to get approximate parameters x0
     fprintf('Evaluating "%s" ...\n', coordinateSTR{i});
-    [y, result_parameterC, xEst, outlierLogical] = computeTrendIRLS(...
+    [y, result_parameterC, x0, outlierLogical] = computeTrendIRLS(...
         t, ... % t in years where t0 = beginning of TS
         data{:, i + 2}, ... % vector with TS metric (Coordinate measurement)
         polynDeg, ...  % polynome degree
@@ -198,10 +199,13 @@ for i = 1:3
         T, ... %  logar. transient parameter T for earthquakes
         KK, ... % n of iterations for IRLS
         p, ... % L_p Norm for IRLS
-        outl_factor); % median(error) + standard deviation * factor -> outlier
+        100); % median(error) + standard deviation * factor -> outlier
+    % nonlinear LSE
+    
+    
     
     % store results in master arrays for further evaluation
-    trenddata(:, i) = y;
+    % trenddata(:, i) = y;
     result_parameters{i, 1} = coordinateSTR{i};
     result_parameters{i, 2} = result_parameterC; % assign parameter cell to super cell
     outlier_logicals{i} = outlierLogical; % 1: suspected outlier measurements, computed in IRLS function
