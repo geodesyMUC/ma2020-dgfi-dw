@@ -42,7 +42,7 @@ fprintf('Design Matrix A: %d x %d\n', size(A, 1), size(A, 2));
 
 % 10 iterations at first
 for k = 1:10
-    fprintf('Iteration %i ...\n', k);
+    fprintf('
     % set up A
     % 1:POLYNOMIAL MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     for i = 0:nPolyn
@@ -73,8 +73,8 @@ for k = 1:10
         tau0 = x0 ( N(4)+cnt+1 );
         % Transient
         A(: , N(4)+cnt : N(4)+cnt+1) = [...
-            log(1 + dt./tau0), ...              % function derivate a
-            (a0*dt)./(tau0.^2 + dt.*tau0) ...   % function derivate tau
+            log(1 + dt./tau0), ...
+            (a0*dt)./(T.^2 + t.*tau0) ...
             ];
         % A(:, N(4) + i) = 1 - exp(-dt ./ T); % exponential transient
         
@@ -84,23 +84,10 @@ for k = 1:10
     [dxEst, e] = computeLeastSquares(A, l);
     x0 = x0 + dxEst;
     l = b - A*x0;
-
+    
 end
 
 xEst = x0;
-y = A*xEst;
-
-% compute results for evaluation
-rms = computeRMS(A, b, xEst);
-% wrms = computeWRMS(A, b, xEst, w); % weights 1 (diag matrix) % NO WRMS IMPLEMENTED YET
-% get rms and wrms into result cell for output
-results{1, 1} = 'rms';
-results{1, 2} = rms;
-results{2, 1} = 'wrms';
-results{2, 2} = rms; % NO WRMS IMPLEMENTED YET
-
-fprintf('WMRS = %.4f, RMS = %.4f\n', rms, rms);
-
 
 end
 
@@ -124,13 +111,4 @@ xEst = pinv(Nmat) * n;
 % Detect & Remove outliers
 e = A * xEst - b; % Error vector
 
-end
-
-function [rms] = computeRMS(A, b, xEst)
-nData = length(b); % number of observations
-rms = sqrt(1/nData * sum((b - A * xEst).^2)); % root mean square
-end
-
-function [wrms] = computeWRMS(A, b, xEst, w_i)
-wrms = sqrt(sum(w_i .* (b - A * xEst).^2)/sum(w_i)); % weighted root mean square
 end

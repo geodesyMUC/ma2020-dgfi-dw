@@ -176,14 +176,14 @@ jumpParam = xEst(N(3) + 1:N(4));
 % Get Jump/Unit Step/Heaviside Parameters
 EQtransient = xEst(N(4) + 1:N(5));
 
-% % "simulated" time series (equally spaced measurements, depending on time interval)
-% xSim = min(x):years(days(1)):max(x); % 1d
-% 
-% % call function
-% % creates y values (e.g. up values) for "simulated" time series
-% y = TimeFunction(xSim, polynParam, periodicParam, W, jt, jumpParam, ...
-%     eqjt, EQtransient, T);
-y = A * xEst;
+% "simulated" time series (equally spaced measurements, depending on time interval)
+xSim = min(x):years(days(1)):max(x); % 1d
+
+% call function
+% creates y values (e.g. up values) for "simulated" time series
+y = TimeFunction(xSim, polynParam, periodicParam, W, jt, jumpParam, ...
+    eqjt, EQtransient, T);
+% y = A * xEst;
 end
 
 %% IRLS Custom Functions
