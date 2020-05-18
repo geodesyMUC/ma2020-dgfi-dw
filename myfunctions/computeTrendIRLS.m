@@ -177,8 +177,9 @@ jumpParam = xEst(N(3) + 1:N(4));
 EQtransient = xEst(N(4) + 1:N(5));
 
 % "simulated" time series (equally spaced measurements, depending on time interval)
-xSim = min(x):years(days(1)):max(x); % 1d
-
+tInterpolation = years(days(1)); % interpolation / sampling interval in YEARS
+xSim = min(x) : tInterpolation : max(x); % interpolation
+xSim = x'; % original values, no interpolation
 % call function
 % creates y values (e.g. up values) for "simulated" time series
 y = TimeFunction(xSim, polynParam, periodicParam, W, jt, jumpParam, ...

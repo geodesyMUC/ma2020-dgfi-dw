@@ -1,4 +1,4 @@
-function [y, results, xEst] = computeNonlinearTrendLS(t, x0, b, L0, nPolyn, W, jt, eqjt)
+function [y, results, xEst] = computeNonlinearTrendLS(t, x0, b, L0, nPolyn, W, jt, eqjt, T)
 % convert datetimes to from [seconds] to [years]
 t = years(seconds(t));       % x./(365.25 * 86400);
 jt = years(seconds(jt));      % jt./(365.25 * 86400);
@@ -19,12 +19,6 @@ N(3) = N(2) + nPeriodicCoeff;
 N(4) = N(3) + nJumps;
 N(5) = N(4) + nEqJumps;
 
-% compute new obs.
-l = b - L0;
-
-% assign approximate values
-T = 1; % tau_log approximate
-
 % extend approximate values to adjust for tau_log approximates
 eqCoeff = zeros(nEqJumps, 1);
 cnt = 0; 
@@ -41,8 +35,11 @@ A = zeros(nData, N(5)); % initialize (measurements x unknown parameters)
 fprintf('Design Matrix A: %d x %d\n', size(A, 1), size(A, 2));
 
 % 10 iterations at first
-for k = 1:10
-    fprintf('Iteration %i ...\n', k);
+for k = 1:50
+%     fprintf('Iteration %i ...\n', k);
+    
+    % set up l
+    l = b - L0;
     % set up A
     % 1:POLYNOMIAL MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     for i = 0:nPolyn
@@ -69,12 +66,12 @@ for k = 1:10
     for i = 1:length(eqjt)
         dt = t - eqjt(i);
         dt( dt<0 ) = 0; % Every observation BEFORE the event
-        a0 = x0( N(4)+cnt ); % approximate value for transient coefficient
-        tau0 = x0 ( N(4)+cnt+1 );
+        a0 = x0( N(4)+cnt ); % approximate value for log amplitude coefficient
+        tau0 = x0 ( N(4)+cnt+1 ); % approximate value for log relaxation coefficient
         % Transient
         A(: , N(4)+cnt : N(4)+cnt+1) = [...
             log(1 + dt./tau0), ...              % function derivate a
-            (a0*dt)./(tau0.^2 + dt.*tau0) ...   % function derivate tau
+            -(a0*dt)./(tau0^2 + dt.*tau0) ...   % function derivate tau
             ];
         % A(:, N(4) + i) = 1 - exp(-dt ./ T); % exponential transient
         
@@ -82,13 +79,18 @@ for k = 1:10
     end
     
     [dxEst, e] = computeLeastSquares(A, l);
-    x0 = x0 + dxEst;
-    l = b - A*x0;
-
+    if isreal(dxEst)    % check if complex numbers
+        x0 = x0 + dxEst;
+        L0 = A*x0;
+    else                % if vector contains complex numbers: abandon and throw warning
+        warning('NLLSE: estimated parameters contain complex numbers - iterating abandoned, current values returned.')
+        break
+    end
+    
 end
 
 xEst = x0;
-y = A*xEst;
+y = L0;
 
 % compute results for evaluation
 rms = computeRMS(A, b, xEst);

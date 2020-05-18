@@ -59,7 +59,7 @@ stationname = '21702M002A07'; % MIZU
 
 %%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Polynomial Trend: Degree
-polynDeg = 1; % integer degree number
+polynDeg = -1; % integer degree number
 % polynDeg = 2;
 % polynDeg = 3;
 
@@ -74,15 +74,16 @@ W = 2 * pi ./ P;
 
 % Parameter T in [years] for computation of logarithmic transient for
 % earthquake events (jumps)
-T = 1.00;
+T = years(days(10));
 
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
 doITRFjump = false; % E - N - U
+doEQjump = false;
 
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
 KK = 0; % n of iterations for IRLS
 p = 2.0; % L_p Norm for IRLS
-outl_factor = 4; % median(error) + standard deviation * factor -> outlier
+outl_factor = 100; % median(error) + standard deviation * factor -> outlier
 
 %%% Output %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 logFileFolder = 'TSA_TrendComputationResults'; % output: log file directory
@@ -143,36 +144,37 @@ t = data{:, 't'}; % [seconds]; for years, do /(365.25 * 86400);
 t0 = data{1, 'date'}; % beginning of ts as datetime
 
 %% Jump table(s)
-HJumps = getRelativeJumps(currStationJumps{:, 2}, t0);
-
 % Distinguish between EQs (invokes log. transient) and other jumps (unknown cause or HW
 % change -> do not invoke transient)
 EQLogical = logical(currStationJumps{:, 4}); % 1:=earthquake; ~1:=no earthquake
 % Get Earthquake Jump Vector - Those Jumps will invoke a log. transient
-EQJump = getRelativeJumps_eq(currStationJumps{:, 2}, t0, EQLogical); 
+EQJump = getRelativeJumps_eq(currStationJumps{:, 2}, t0, EQLogical);
 
+if doEQjump
+    HJumps = getRelativeJumps(currStationJumps{:, 2}, t0);
+else
+    HJumps = getRelativeJumps_eq(currStationJumps{:, 2}, t0, ~EQLogical);
+end
 %% Add ITRF Realization Change Jumps
+fprintf('doITRFjumps set to "%s"\n',  doITRFjump);
 if doITRFjump
-    fprintf('Considering ITRF jumps, doITRFjump is set to "true".\n')
-    
     jumps0itrf = getRelativeITRFJumps(t0, itrf_changes_textfile);
-    
     % append itrf jumps to heaviside jumps vector
     HJumps = [HJumps; jumps0itrf];
-else
-    fprintf('Not considering ITRF jumps, doITRFjump is set to "false".\n')
 end
 
 %% Prepare Trend Estimation
 % preallocate cell arrays
 result_parameters = cell(3, 2);
 outlier_logicals = cell(3, 1);
+
 % create datetime array with equal date intervals (1d)
-% % dateIntvl =  data{:, 'date'}; % verify integrity of algorithm COMMENT
-dateIntvl =  min(data{:, 'date'}):days(1):max(data{:, 'date'}); %
+tInterpolV =  data{:, 'date'}; % verify integrity of algorithm COMMENT
+% dateIntvl =  min(data{:, 'date'}):days(1):max(data{:, 'date'}); %
 % n of intervals (ie days)
-dateIntvlN = length(dateIntvl);
-trenddata = zeros(dateIntvlN, 3);
+dateIntvlN = length(tInterpolV);
+% trenddata = zeros(dateIntvlN, 3); % preallocate trend data array
+trenddata = [];
 
 %% Write Input Parameters to log file
 writeInputLog(fID, stationname, data{:, 'date'}, ...
@@ -187,7 +189,7 @@ nEQJumps = length(EQJump); % Only EQ Jumps -> n of transients
 
 %% Trend Estimation
 for i = 1:3
-    % 1st LSE to get approximate parameters x0
+    % LSE to get approximate parameters x0
     fprintf('Evaluating "%s" ...\n', coordinateSTR{i});
     [y, result_parameterC, xEst, outlierLogical] = computeTrendIRLS(...
         t, ... % t in years where t0 = beginning of TS
@@ -199,20 +201,19 @@ for i = 1:3
         T, ... %  logar. transient parameter T for earthquakes
         KK, ... % n of iterations for IRLS
         p, ... % L_p Norm for IRLS
-        100); % median(error) + standard deviation * factor -> outlier
-    % nonlinear LSE
-%     [y, results, xEst] = computeNonlinearTrendLS(t, x0, data{:, i + 2}, L0, polynDeg, W, HJumps, EQJump);
-    
-    
+        outl_factor); % median(error) + standard deviation * factor -> outlier
+    % NLLSE: nonlinear LSE
+    [y, results, xEst] = computeNonlinearTrendLS(t, xEst, data{:, i + 2}, y, polynDeg, W, HJumps, EQJump, T);
+        
     % store results in master arrays for further evaluation
-    % trenddata(:, i) = y;
+    trenddata(:, i) = y;
     result_parameters{i, 1} = coordinateSTR{i};
-    result_parameters{i, 2} = result_parameterC; % assign parameter cell to super cell
+    result_parameters{i, 2} = results; % assign parameter cell to super cell
     outlier_logicals{i} = outlierLogical; % 1: suspected outlier measurements, computed in IRLS function
     
     % print output parameters using custom function
     writeOutputLog(fID, [stationname, '-', coordinateSTR{i}], xEst, ...
-        polynDeg, P, HJumps, EQJump, result_parameterC{1, 2}, result_parameterC{2, 2})
+        polynDeg, P, HJumps, EQJump, results{1, 2}, results{2, 2})
 end
 fclose(fID); % close log file
 fprintf('Calculation finished.\nPlotting and writing results ...\n')
@@ -224,7 +225,7 @@ resultSaveFile = fullfile(logFileFolder, [stationname, ...
     '.csv']); % output: file name of computed trends (csv)
 
 % use custom fct
-resultM = writeResultMatrix(dateIntvl, trenddata, doITRFjump, KK, p, outl_factor, ...
+resultM = writeResultMatrix(tInterpolV, trenddata, doITRFjump, KK, p, outl_factor, ...
     [result_parameters{1, 2}{1, 2}, result_parameters{2, 2}{1, 2}, result_parameters{3, 2}{1, 2}], ...
     [result_parameters{1, 2}{2, 2}, result_parameters{2, 2}{2, 2}, result_parameters{3, 2}{2, 2}]);
 
@@ -251,7 +252,7 @@ end
 figTSA = figure;
 VisualizeTS_Trend_Outliers_ITRF_ENU(...
     data{:, 'date'}, [data{:, 3}, data{:, 4}, data{:, 5}], outlier_logicals, coordinateSTR, ...
-    dateIntvl, trenddata, ...
+    tInterpolV, trenddata, ...
     titleString, ...
     currStationJumps{:, 'Date'}, ...
     [currStationJumps{:, 'Earthquake'}, currStationJumps{:, 'HWSW_Change'}, currStationJumps{:, 'Unknown'}], ...

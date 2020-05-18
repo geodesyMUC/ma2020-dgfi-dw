@@ -1,4 +1,4 @@
-function [] = writeOutputLog(fID, ts_name, xEst, polynDeg, P, HJumps, EQJump, rms, wrms)
+function [] = writeOutputLog(fID, ts_name, xEst, polynDeg, W, HJumps, EQJump, rms, wrms)
 %writeOutputLog writes output parameters to a formatted log file
 %   fID: log file identifier
 %   ts_name: Name of Time Series
@@ -12,16 +12,16 @@ function [] = writeOutputLog(fID, ts_name, xEst, polynDeg, P, HJumps, EQJump, rm
 
 % get count of unknowns for each type (poly, osc, jumps, transients)
 nPolynTerms = polynDeg + 1; % 0, 1, 2, ... 
-nOscParam = length(P) * 2; % cos & sin components (C, S) for every oscillation
+nOscParam = length(W) * 2; % cos & sin components (C, S) for every oscillation
 nJumps = length(HJumps); % All Jumps - From DB and ITRF (if set to true)
-nEQJumps = length(EQJump); % Only EQ Jumps -> n of transients
+nEQJumps = length(EQJump)*2; % Only EQ Jumps -> n of transients
 
 fprintf(fID, '\n### OUTPUT RESULTS FOR "%s" COORDINATE, ITERATIVELY REWEIGHTED LEAST SQUARES ###\n', ts_name);
 
 strP = sprintf('p(%d): %.5f | ', [1:nPolynTerms; xEst(1:nPolynTerms)']); % Polynomial Coefficients
-if ~isempty(P)
+if ~isempty(W)
     strW = sprintf('w(%d): A = % .2fmm, C = % .2fmm,  S = % .2fmm\n', ...
-        [1:length(P); ...
+        [1:length(W); ...
         sqrt(xEst(nPolynTerms + 1:2:nPolynTerms + nOscParam)'.^2 + ...
         xEst(nPolynTerms + 2:2:nPolynTerms + nOscParam)'.^2); % Amplitude A
         xEst(nPolynTerms + 1:2:nPolynTerms + nOscParam)'; ... % Oscillations C
@@ -36,10 +36,15 @@ else
     strH = 'None estimated';
 end
 if ~isempty(EQJump)
-    strEQ = sprintf('A(%d): % .2fmm\n', [1:nEQJumps; ...
+    strEQA = sprintf('A(%d): % .2fmm\n', [1:nEQJumps/2; ...
         xEst(...
-        nPolynTerms + nOscParam + nJumps + 1:...
+        nPolynTerms + nOscParam + nJumps + 1: 2 :... % every 2nd element
         nPolynTerms + nOscParam + nJumps + nEQJumps)']); % EQ Jumps
+    strEQTau = sprintf('Tau(%d): % .3fd\n',  [1:nEQJumps/2; ...
+        days(years(xEst(...
+        nPolynTerms + nOscParam + nJumps + 2: 2 :... % every 2nd element
+        nPolynTerms + nOscParam + nJumps + nEQJumps)'))]); % EQ Jumps
+    strEQ = [strEQA strEQTau];
 else
     strEQ = 'None estimated';
 end
