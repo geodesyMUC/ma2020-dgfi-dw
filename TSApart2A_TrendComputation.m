@@ -33,7 +33,7 @@ addpath('myfunctions')
 inputFolder = 'station_data_dailyXYZfiles'; % Where Station Data (TSA_ReadAndTransform) is stored as ".mat"
 jumpCSVLocation = 'src/jumps_dailyXYZfiles.csv'; % Location of Jump Table/Jump Database
 itrf_changes_textfile = 'src/itrf_changes.txt';
-
+doSaveResults = false; % save pngs and result files
 %%% Name of station to be analysed %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SELECTION FOR ANALYSIS
 
@@ -231,7 +231,7 @@ resultM = writeResultMatrix(tInterpolV, trenddata, doITRFjump, KK, p, outl_facto
 
 % write matrix to csv file
 %writematrix(resultM, resultSaveFile, 'Delimiter', 'comma') % R2019a
-csvwrite(resultSaveFile, resultM); % R2006
+if doSaveResults; csvwrite(resultSaveFile, resultM); end% R2006
 
 %% Visualize Results
 % set up title
@@ -266,7 +266,7 @@ set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
 %% PRINT PLOT
 plot_title = [stationname, '-trend.png'];
 plot_dir = 'stationTSA_dailyXYZfiles_xyz_plots';
-% saveas(figTSA, fullfile(plot_dir, plot_title)); % Save figure as image file
+if doSaveResults; saveas(figTSA, fullfile(plot_dir, plot_title)); end% Save figure as image file
 
 %%
 fprintf('Done!\n')
