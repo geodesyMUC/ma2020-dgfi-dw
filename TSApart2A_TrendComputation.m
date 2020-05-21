@@ -1,5 +1,5 @@
 % Time Series Analysis, Part 2A: MASTER THESIS Nov2019
-% This script reads in station coordinates for a SINGLE station, 
+% This script reads in station coordinates for a SINGLE station,
 % calculates a trend based on the specified parameters to be estimated in a
 % Iteratively Reweighted Least Squares (IRLS) Algorithm
 % (polynome degree, oscillations, jumps, ...) and plots the result.
@@ -46,7 +46,7 @@ doSaveResults = false; % save pngs and result files
 % stationname = 'MZAE'; % Santa Rosa, Argentina (missing jump)
 % stationname = 'NEIL'; % Ciudad Neilly, Costa Rica
 % stationname = 'RWSN'; % Rawson, Argentina
-% stationname = 'PBJP'; 
+% stationname = 'PBJP';
 
 % stationname = '21701S007A03'; % KSMV
 stationname = '21702M002A07'; % MIZU
@@ -75,6 +75,8 @@ W = 2 * pi ./ P;
 % Parameter T in [years] for computation of logarithmic transient for
 % earthquake events (jumps)
 T = years(days(10));
+% vector mapping different T (tau) relaxation coefficients
+tauVec = years(days(1:10:1000));
 
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
 doITRFjump = false; % E - N - U
@@ -91,8 +93,8 @@ logFile = [stationname, '_TrendComputation_log.txt']; % output: log file name
 
 %% CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if ~exist(logFileFolder, 'dir')
-   mkdir(logFileFolder)
-   fprintf('Result file storage directory "%s" created.\n', logFileFolder);
+    mkdir(logFileFolder)
+    fprintf('Result file storage directory "%s" created.\n', logFileFolder);
 end
 
 % Open Log File and get identifier
@@ -167,6 +169,7 @@ end
 % preallocate cell arrays
 result_parameters = cell(3, 2);
 outlier_logicals = cell(3, 1);
+outlier_logicals = cellfun(@(x) zeros(length(t), 1), outlier_logicals, 'UniformOutput', false); % workaround for no outliers
 
 % create datetime array with equal date intervals (1d)
 tInterpolV =  data{:, 'date'}; % verify integrity of algorithm COMMENT
@@ -182,39 +185,75 @@ writeInputLog(fID, stationname, data{:, 'date'}, ...
 
 % other variables - get count of unknowns for each type (poly, osc, jumps,
 % transients)
-nPolynTerms = polynDeg + 1; % 0, 1, 2, ... 
+nPolynTerms = polynDeg + 1; % 0, 1, 2, ...
 nOscParam = length(W) * 2; % cos & sin components (C, S) for every oscillation
 nJumps = length(HJumps); % All Jumps - From DB and ITRF (if set to true)
 nEQJumps = length(EQJump); % Only EQ Jumps -> n of transients
 
 %% Trend Estimation
-for i = 1:3
-    % LSE to get approximate parameters x0
-    fprintf('Evaluating "%s" ...\n', coordinateSTR{i});
-    [y, result_parameterC, xEst, outlierLogical] = computeTrendIRLS(...
-        t, ... % t in years where t0 = beginning of TS
-        data{:, i + 2}, ... % vector with TS metric (Coordinate measurement)
-        polynDeg, ...  % polynome degree
-        W, ...  % periods
-        HJumps, ...  % jumps: time in years since t0
-        EQJump, ... % eqs jumps: time in years since t0
-        T, ... %  logar. transient parameter T for earthquakes
-        KK, ... % n of iterations for IRLS
-        p, ... % L_p Norm for IRLS
-        outl_factor); % median(error) + standard deviation * factor -> outlier
-    % NLLSE: nonlinear LSE
-    [y, results, xEst] = computeNonlinearTrendLS(t, xEst, data{:, i + 2}, y, polynDeg, W, HJumps, EQJump, T);
+% Loop tau values
+resultArray = [];
+% figure;
+% plot(t, data{:, 3})
+% hold all
+for i = 1:length(tauVec)
+    for j = 1:3 % E,N,U
+        % LSE to get approximate parameters x0
+        fprintf('Evaluating "%s" ...\n', coordinateSTR{j});
+        [y, result_parameterC, xEst, ~] = computeTrendIRLS(... % trend, rms/wrms, parameters, outlier logical
+            t, ... % t in years where t0 = beginning of TS
+            data{:, j + 2}, ... % vector with TS metric (Coordinate measurement)
+            polynDeg, ...  % polynome degree
+            W, ...  % periods
+            HJumps, ...  % jumps: time in years since t0
+            EQJump, ... % eqs jumps: time in years since t0
+            tauVec(i), ... %  logar. transient parameter T for earthquakes
+            KK, ... % n of iterations for IRLS
+            p, ... % L_p Norm for IRLS
+            outl_factor); % median(error) + standard deviation * factor -> outlier
         
-    % store results in master arrays for further evaluation
-    trenddata(:, i) = y;
-    result_parameters{i, 1} = coordinateSTR{i};
-    result_parameters{i, 2} = results; % assign parameter cell to super cell
-    outlier_logicals{i} = outlierLogical; % 1: suspected outlier measurements, computed in IRLS function
-    
-    % print output parameters using custom function
-    writeOutputLog(fID, [stationname, '-', coordinateSTR{i}], xEst, ...
-        polynDeg, P, HJumps, EQJump, results{1, 2}, results{2, 2})
+        resultArray(i, :, j) = [result_parameterC{1,2}, result_parameterC{1,2}, xEst'];
+            
+        %         plot(t, y)
+    end
 end
+% hold off
+
+% create map plot
+for i = 1:3
+    figure
+    
+    plot(days(years(tauVec)), resultArray(:,1,i))
+    xlabel('\tau_{log} [days]')
+    ylabel('rms [mm]')
+    title(coordinateSTR{i})
+end
+% get best solution vTv (idx)
+[~, EMinIdx]    = min( resultArray(:,1,1) );
+[~, NMinIdx]    = min( resultArray(:,1,2) );
+[~, UMinIdx]    = min( resultArray(:,1,3) );
+[~, ENMinIdx]   = min(sum( resultArray(:, 1, 1:2) ,3));
+[~, TotalMinIdx]= min(sum( resultArray(:, 1, 1:3) ,3));
+
+% compute time series based on found solution for ENU
+for i = 1:3
+    trenddata(:, i) = TimeFunction(years(seconds(t)), [], [], [], [], [], EQJump, resultArray(ENMinIdx,3, i), ...
+        tauVec(ENMinIdx));
+end
+
+% save results, write logs
+% trenddata(:, j) = y;
+for i = 1:3
+    result_parameters{i, 1} = coordinateSTR{i};
+    result_parameters{i, 2} = ...
+        {'rms', resultArray(ENMinIdx,1,i); 'wrms', resultArray(ENMinIdx,2,i)}; % assign parameter cell to super cell
+end
+% writeOutputLog(fID, [stationname, '-', coordinateSTR{j}], xEst, ...
+%     polynDeg, P, HJumps, EQJump, results{1, 2}, results{2, 2})
+% outlier_logicals{j} = outlierLogical; % 1: suspected outlier measurements, computed in IRLS function
+
+% continue evaluation of found solution
+
 fclose(fID); % close log file
 fprintf('Calculation finished.\nPlotting and writing results ...\n')
 
@@ -239,11 +278,8 @@ titleString = cell(3, 1);
 titleStringPattern = 'Station: %s - n of Obs.=%d - ITRF Jumps: %s - RMS = %.2fmm';
 
 for i = 1:3 % for E N U respectively
-    if doITRFjump == true
-        ITRFstring = 'true';
-    else
-        ITRFstring = 'false';
-    end
+    if doITRFjump == true; ITRFstring = 'true';
+    else; ITRFstring = 'false'; end
     % set up plot title
     titleString{i} = sprintf(titleStringPattern, ...
         stationname, size(data{:, 'date'}, 1), ITRFstring, result_parameters{i,2}{1,2});

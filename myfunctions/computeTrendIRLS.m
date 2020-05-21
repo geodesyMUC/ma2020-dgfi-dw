@@ -29,7 +29,7 @@ if nargin == 6 || nargin == 9
     T = 1; % assign default value 1y for logar. transient parameter T
 end
 
-% convert datetimes to from [seconds] to [years]
+% convert datetimes from [seconds] to [years]
 x = years(seconds(x));       % x./(365.25 * 86400);
 jt = years(seconds(jt));      % jt./(365.25 * 86400);
 eqjt = years(seconds(eqjt));    % eqjt./(365.25 * 86400);
@@ -133,22 +133,22 @@ for k = 1:KK
     
 end
 
-%% (4) QA Plots & Stats
-figure
-plot(0:KK, RMS_vector, 'bx-')
-hold on
-plot(0:KK, WRMS_vector, 'mx-')
-grid on
-title('rms/wrms error')
-xlabel('# Iteration ->')
-ylabel('error [mm]')
-
-figure
-plot(1:KK, E, 'bx-')
-grid on
-title(sprintf('irls error: p norm (p=%.1f)', p))
-ylabel('p norm [mm]')
-xlabel('# Iteration ->')
+% %% (4) QA Plots & Stats
+% figure
+% plot(0:KK, RMS_vector, 'bx-')
+% hold on
+% plot(0:KK, WRMS_vector, 'mx-')
+% grid on
+% title('rms/wrms error')
+% xlabel('# Iteration ->')
+% ylabel('error [mm]')
+% 
+% figure
+% plot(1:KK, E, 'bx-')
+% grid on
+% title(sprintf('irls error: p norm (p=%.1f)', p))
+% ylabel('p norm [mm]')
+% xlabel('# Iteration ->')
 
 % get rms and wrms into result cell for output
 results{1, 1} = 'rms';
@@ -165,14 +165,11 @@ fprintf('WMRS = %.4f, RMS = %.4f\n', wrms, rms);
 
 % Get Polynomial parameters
 polynParam = xEst(N(1) + 1:N(2));
-
 % Get periodic parameters (C&S: cos, sin)
 periodicParam = xEst(N(2) + 1:N(3));
 periodicParam = [periodicParam(1:2:end - 1)'; periodicParam(2:2:end)'];
-
 % Get Jump/Unit Step/Heaviside Parameters
 jumpParam = xEst(N(3) + 1:N(4));
-
 % Get Jump/Unit Step/Heaviside Parameters
 EQtransient = xEst(N(4) + 1:N(5));
 
@@ -266,56 +263,4 @@ catch
     fprintf('Using Moore-Penrose pseudoinverse for Inversion of normal equation matrix.\n');
     x = pinv(A, 0.001) * B;
 end
-end
-
-function Y = TimeFunction(x, pol, CS, w, jt, b, eqjt, a, T)
-% Creates time series from estimated parameters
-% x: timestamps
-% pol: polynomial coeffiecients
-% CS: cos/sin periodic coefficients
-% w: vector containing periods (rad)
-% shift
-% amplitude of transient
-% relaxation time T
-
-pol_N = length(pol); % number of polynomial coeffiecients
-w_N = length(w); % number of periodic coefficients
-jump_N = length(jt); % number of shifts
-eq_N = length(eqjt); % number of logarithmic transients
-
-yy = zeros(size(x, 2), pol_N + w_N + jump_N + eq_N);
-
-cnt = 1; % counter variable for incremenation
-% polynom terms
-for i = 0:pol_N - 1
-    yy(:, cnt) = pol(i + 1) * x.^(i);
-    cnt = cnt + 1;
-end
-
-% periodic terms
-for i = 1:w_N
-    yy(:, cnt) = CS(1, i) * cos(x * w(i)) + CS(2, i) * sin(x * w(i));
-    cnt = cnt + 1;
-end
-
-% jump terms
-for i = 1:jump_N
-    yy(:, cnt) = b(i) * heaviside(x - jt(i));
-    cnt = cnt + 1;
-end
-
-% transient terms
-% T = 1; % T = 1y -> constant
-for i = 1:eq_N
-    dt = x - eqjt(i);
-    dt(dt < 0) = 0; % Every observation BEFORE the eq event
-    % compute
-    yy(:, cnt) = a(i) * log(1 + dt ./ T); % logarithmic
-%     yy(:, cnt) = a(i) * (1 - exp(-dt ./ T)); % exponential
-    % increment counter
-    cnt = cnt + 1;
-end
-
-% x(t) = term1 + term2 + ... + termCNT
-Y = sum(yy, 2); % row sum -> sum up all terms to compute y
 end
