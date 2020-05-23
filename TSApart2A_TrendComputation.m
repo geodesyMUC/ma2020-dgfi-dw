@@ -77,7 +77,7 @@ W = 2 * pi ./ P;
 T = years(days(10));
 % vector mapping different T (tau) relaxation coefficients
 tauVec1 = years(days(1:10:199));
-tauVec2 = years(days(200:10:1000));
+tauVec2 = years(days(200:30:1095));
 
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
 doITRFjump = false; % E - N - U
@@ -225,12 +225,21 @@ for i = 1:length(tauVec)
 end
 % create map plot
 for i = 1:3
-    figure
-    
-    plot(days(years(tauVec)), resultArray(:,1,i))
-    xlabel('\tau_{log} [days]')
-    ylabel('rms [mm]')
-    title(coordinateSTR{i})
+    if isempty(tauVec2)
+        figure
+        plot(days(years(tauVec)), resultArray(:,1,i))
+        xlabel('\tau_{log} [days]')
+        ylabel('rms [mm]')
+        title(coordinateSTR{i})
+    elseif ~isempty(tauVec2)
+        colormap(flipud(parula)) % low error = good
+        resultGrid = reshape(resultArray(:, 1, i), length(tauVec2), length(tauVec1));
+        figure
+        contourf(days(years(tauVec1)),days(years(tauVec2)),resultGrid);
+        xlabel('\tau_{log1}SHORT [days]')
+        ylabel('\tau_{log2}LONG [days]')
+        colorbar
+    end
 end
 % get best solution vTv (idx)
 [~, EMinIdx]    = min( resultArray(:,1,1) );
@@ -241,8 +250,9 @@ end
 
 % compute time series based on found solution for ENU
 for i = 1:3
-    trenddata(:, i) = TimeFunction(years(seconds(t)), [], [], [], [], [], EQJump, resultArray(ENMinIdx,3, i), ...
-        tauVec(ENMinIdx));
+    trenddata(:, i) = TimeFunction(years(seconds(t)), [], [], [], [], [], EQJump, ...
+        resultArray(ENMinIdx,3+nPolynTerms+nOscParam+nJumps:end, i), ...
+        tauVec(ENMinIdx, :));
 end
 
 % save results, write logs
