@@ -17,7 +17,7 @@ end
 pol_N = length(pol); % number of polynomial coeffiecients
 w_N = length(w); % number of periodic coefficients
 jump_N = length(jt); % number of shifts
-eq_N = length(eqjt); % number of logarithmic transients
+eq_N = length(eqjt)*length(T); % number of logarithmic transients (n_events * n_tau)
 
 yy = zeros(size(x, 2), pol_N + w_N + jump_N + eq_N);
 
@@ -42,14 +42,15 @@ end
 
 % transient terms
 % T = 1; % T = 1y -> constant
-for i = 1:eq_N
+for i = 1:2:eq_N
     dt = x - eqjt(i);
     dt(dt < 0) = 0; % Every observation BEFORE the eq event
     % compute
-    yy(:, cnt) = a(i) * log(1 + dt ./ T); % logarithmic
+    yy(:, cnt   ) = a(i  ) * log( 1 + dt./T(1) ); % logarithmic transient 1
 %     yy(:, cnt) = a(i) * (1 - exp(-dt ./ T)); % exponential
-    % increment counter
-    cnt = cnt + 1;
+    yy(:, cnt+1 ) = a(i+1) * log( 1 + dt./T(2) ); % logarithmic transient 2
+    % increment counter with number of Tau
+    cnt = cnt + length(T);
 end
 
 % x(t) = term1 + term2 + ... + termCNT

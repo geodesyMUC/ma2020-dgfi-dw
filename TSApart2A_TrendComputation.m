@@ -76,7 +76,8 @@ W = 2 * pi ./ P;
 % earthquake events (jumps)
 T = years(days(10));
 % vector mapping different T (tau) relaxation coefficients
-tauVec = years(days(1:10:1000));
+tauVec1 = years(days(1:10:199));
+tauVec2 = years(days(200:10:1000));
 
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
 doITRFjump = false; % E - N - U
@@ -188,14 +189,21 @@ writeInputLog(fID, stationname, data{:, 'date'}, ...
 nPolynTerms = polynDeg + 1; % 0, 1, 2, ...
 nOscParam = length(W) * 2; % cos & sin components (C, S) for every oscillation
 nJumps = length(HJumps); % All Jumps - From DB and ITRF (if set to true)
-nEQJumps = length(EQJump); % Only EQ Jumps -> n of transients
-
+nEQJumps = length(EQJump) * (size(tauVec1, 1)+size(tauVec1, 1)); % Only EQ Jumps -> n of transients
+%% Preparation for Trend Estimation
+% set up tau vector
+if ~isempty(tauVec2) % only if two parameters per EQ event
+    [tauGrid1, TauGrid2] = meshgrid(tauVec1, tauVec2); % create two grids
+    tauGrid = cat(2, tauGrid1, TauGrid2); % cat along 2nd dimension
+    tauVec = reshape(tauGrid, [], 2); % reshape to 2 col vector with rows (tau1, tau2)
+else % if only 1 parameter tau per EQ event
+    tauVec = tauVec1';
+end
+% prepare array to store results rms,wrms,est.params FOR EVERY COMBINATION
+% OF TAU and E,N,U
+resultArray = zeros( size(tauVec,2) , 2+nPolynTerms+nOscParam+nJumps+nEQJumps , 3 );
 %% Trend Estimation
 % Loop tau values
-resultArray = [];
-% figure;
-% plot(t, data{:, 3})
-% hold all
 for i = 1:length(tauVec)
     for j = 1:3 % E,N,U
         % LSE to get approximate parameters x0
@@ -207,18 +215,14 @@ for i = 1:length(tauVec)
             W, ...  % periods
             HJumps, ...  % jumps: time in years since t0
             EQJump, ... % eqs jumps: time in years since t0
-            tauVec(i), ... %  logar. transient parameter T for earthquakes
+            tauVec(i, :), ... %  logar. transient parameter T for earthquakes
             KK, ... % n of iterations for IRLS
             p, ... % L_p Norm for IRLS
             outl_factor); % median(error) + standard deviation * factor -> outlier
         
-        resultArray(i, :, j) = [result_parameterC{1,2}, result_parameterC{1,2}, xEst'];
-            
-        %         plot(t, y)
+        resultArray(i, :, j) = [result_parameterC{1,2}, result_parameterC{1,2}, xEst'];        
     end
 end
-% hold off
-
 % create map plot
 for i = 1:3
     figure
@@ -242,7 +246,6 @@ for i = 1:3
 end
 
 % save results, write logs
-% trenddata(:, j) = y;
 for i = 1:3
     result_parameters{i, 1} = coordinateSTR{i};
     result_parameters{i, 2} = ...

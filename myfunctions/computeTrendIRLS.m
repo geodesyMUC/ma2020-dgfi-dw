@@ -36,18 +36,18 @@ eqjt = years(seconds(eqjt));    % eqjt./(365.25 * 86400);
 
 % parameter counts
 nData = length(x); % number of observations
-nPolynTerms = nPolyn + 1; % 0, 1, 2, ... 
+nPolynTerms = nPolyn+1; % 0, 1, 2, ... 
 nPeriodic = length(W); % oscillations
-nPeriodicCoeff = nPeriodic * 2; % cos & sin components (C, S) for every oscillation
-nJumps = length(jt); % All Jumps - From DB and ITRF (if set to true)
-nEqJumps = length(eqjt); % number of eq jumps -> transient
+nPeriodicCoeff = nPeriodic*2; % cos & sin components (C, S) for every oscillation
+nJumpCoeff = length(jt); % All Jumps - From DB and ITRF (if set to true)
+nEqParam = length(eqjt)*length(T); % number of eq jumps -> transient * number of T
 
-% Set up Parameter Storage Vector
+% Set up Map N: n of Parameter Storage Vector
 N(1) = 0;
 N(2) = N(1) + nPolynTerms;
 N(3) = N(2) + nPeriodicCoeff;
-N(4) = N(3) + nJumps;
-N(5) = N(4) + nEqJumps;
+N(4) = N(3) + nJumpCoeff;
+N(5) = N(4) + nEqParam;
 
 %% set up design matrix A
 A = zeros(nData, N(5)); % initialize (measurements x unknown parameters)
@@ -67,19 +67,22 @@ for i = 1:length(W)
 end
 
 % 3:JUMP MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-for i = 1:nJumps
+for i = 1:nJumpCoeff
     % Heaviside Jump
     A(:, N(3) + i) = heaviside(x - jt(i));
 end
 
 % 4:TRANSIENT MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Calculate logarithmic transient for all earthquakes in this TS
-for i = 1:nEqJumps
+% For every EQ Event, there needs to be (n of Tau) columns
+for i = 1:2:nEqParam
     dt = x - eqjt(i);
     dt(dt < 0) = 0; % Every observation BEFORE the event
-    % Transient
-    A(:, N(4) + i) = log(1 + dt ./ T); % logarithmic transient
-%     A(:, N(4) + i) = 1 - exp(-dt ./ T); % exponential transient
+    % Transient 1
+    A(:, N(4)+i  ) = log( 1 + dt./T(1) ); % logarithmic transient 1
+%     A(:, N(4) + i) = 1 - exp(-dt ./ T(1)); % exponential transient 1
+    % Transient 2
+    A(:, N(4)+i+1) = log( 1 + dt./T(2) ); % logarithmic transient 2
 end
 
 %% (1) Calculate initial parameters xEst from A, b
