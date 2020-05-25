@@ -59,11 +59,11 @@ for i = 0:nPolyn
 end
 
 % 2:OSCILLATION MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-cnt = 0; % counter for periodic coefficients
+cnt = 1; % counter for periodic coefficients
 
 for i = 1:length(W)
-    A(:, N(2) +  1 + cnt:N(2) +  cnt + 2) = [cos(x * W(i)), sin(x * W(i))];
-    cnt = cnt + 2; % increment to match coefficients
+    A(:, N(2)+cnt:N(2)+cnt+1) = [cos(x * W(i)), sin(x * W(i))];
+    cnt = cnt+2; % increment to match coefficients
 end
 
 % 3:JUMP MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -75,14 +75,16 @@ end
 % 4:TRANSIENT MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Calculate logarithmic transient for all earthquakes in this TS
 % For every EQ Event, there needs to be (n of Tau) columns
-for i = 1:2:nEqParam
+cnt=1;
+for i = 1:length(eqjt)
     dt = x - eqjt(i);
     dt(dt < 0) = 0; % Every observation BEFORE the event
     % Transient 1
-    A(:, N(4)+i  ) = log( 1 + dt./T(1) ); % logarithmic transient 1
+    A(:, N(4)+cnt  ) = log( 1 + dt./T(1) ); % logarithmic transient 1
 %     A(:, N(4) + i) = 1 - exp(-dt ./ T(1)); % exponential transient 1
     % Transient 2
-    A(:, N(4)+i+1) = log( 1 + dt./T(2) ); % logarithmic transient 2
+    A(:, N(4)+cnt+1) = log( 1 + dt./T(2) ); % logarithmic transient 2
+    cnt=cnt+2;
 end
 
 %% (1) Calculate initial parameters xEst from A, b

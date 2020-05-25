@@ -48,14 +48,14 @@ doSaveResults = false; % save pngs and result files
 % stationname = 'RWSN'; % Rawson, Argentina
 % stationname = 'PBJP';
 
-% stationname = '21701S007A03'; % KSMV
-stationname = '21702M002A07'; % MIZU
-% stationname = '21729S007A04'; % USUDA
-% stationname = '21754S001A01'; % P-Okushiri - Hokkaido
-% stationname = '21778S001A01'; % P-Kushiro - Hokkaido
-% stationname = '23104M001A01'; % Medan (North Sumatra)
-% stationname = '41705M003A04'; % Santiago
-% stationname = '41719M004A02'; % Concepcion
+% stationname = '21701S007A03'; % KSMV %[ok]
+% stationname = '21702M002A07'; % MIZU %[ok]
+% stationname = '21729S007A04'; % USUDA %[ok]
+% stationname = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
+% stationname = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
+% stationname = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
+% stationname = '41705M003A04'; % Santiago %[ok, doeqjumps]
+stationname = '41719M004A02'; % Concepcion %[ok]
 
 %%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Polynomial Trend: Degree
@@ -70,14 +70,14 @@ P = [];
 % P(3) = 10;
 
 % convert oscillations to angular velocity
-W = 2 * pi ./ P;
+W = 2*pi./P;
 
 % Parameter T in [years] for computation of logarithmic transient for
 % earthquake events (jumps)
 T = years(days(10));
 % vector mapping different T (tau) relaxation coefficients
-tauVec1 = years(days(1:10:199));
-tauVec2 = years(days(200:30:1095));
+tauVec1 = years(days(1:10:200));
+tauVec2 = years(days(201:30:365));
 
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
 doITRFjump = false; % E - N - U
@@ -121,7 +121,7 @@ end
 % Reassign currStation variable
 data = currStation.Data;
 dataSTATION_NAME = currStation.Station;
-% data = sortrows(data, 1); % sort rows according to datetime column ASC
+data = sortrows(data, 1); % sort rows according to datetime column ASC
 
 % Load Jump Table using custom import function
 dataJump = importfileJumpCSV(jumpCSVLocation);
@@ -144,6 +144,7 @@ VisualizeTS_ENU2(data, dataSTATION_NAME, currStationJumps{:, 2}, ...
 
 %% PREPARE PARAMETERS FOR TREND ESTIMATION
 t = data{:, 't'}; % [seconds]; for years, do /(365.25 * 86400);
+t=t-t(1); % adjust for negative t values
 t0 = data{1, 'date'}; % beginning of ts as datetime
 
 %% Jump table(s)
@@ -232,9 +233,9 @@ for i = 1:3
         ylabel('rms [mm]')
         title(coordinateSTR{i})
     elseif ~isempty(tauVec2)
-        colormap(flipud(parula)) % low error = good
         resultGrid = reshape(resultArray(:, 1, i), length(tauVec2), length(tauVec1));
         figure
+        colormap(flipud(parula)) % low error = good
         contourf(days(years(tauVec1)),days(years(tauVec2)),resultGrid);
         xlabel('\tau_{log1}SHORT [days]')
         ylabel('\tau_{log2}LONG [days]')
@@ -250,8 +251,13 @@ end
 
 % compute time series based on found solution for ENU
 for i = 1:3
-    trenddata(:, i) = TimeFunction(years(seconds(t)), [], [], [], [], [], EQJump, ...
-        resultArray(ENMinIdx,3+nPolynTerms+nOscParam+nJumps:end, i), ...
+    trenddata(:, i) = TimeFunction(years(seconds(t)), ...
+        resultArray(ENMinIdx,3 : 3+nPolynTerms-1, i), ...
+        [], [], ...
+        years(seconds(HJumps)), ...
+        resultArray(ENMinIdx,3+nPolynTerms+nOscParam : 3+nPolynTerms+nOscParam+nJumps-1, i), ...
+        years(seconds(EQJump)), ...
+        resultArray(ENMinIdx,3+nPolynTerms+nOscParam+nJumps : end, i), ...
         tauVec(ENMinIdx, :));
 end
 

@@ -1,15 +1,14 @@
 function Y = TimeFunction(x, pol, CS, w, jt, b, eqjt, a, T)
 % Creates time series from estimated parameters
-% x: timestamps
+% x: timestamps [years]
 % pol: polynomial coeffiecients
 % CS: cos/sin periodic coefficients
 % w: vector containing periods (rad)
 % shift
 % b: jump terms
-% eq jump times
+% eq jump times [years]
 % amplitude of transient
-% relaxation time T in seconds
-
+% relaxation time T [years]
 if size(x, 1) > size(x, 2) % fix row/col 
     x = x';
 end
@@ -43,7 +42,7 @@ end
 % transient terms
 % T = 1; % T = 1y -> constant
 for i = 1:2:eq_N
-    dt = x - eqjt(i);
+    dt = x - eqjt(round(i/2)); % num coeff!=num eq events
     dt(dt < 0) = 0; % Every observation BEFORE the eq event
     % compute
     yy(:, cnt   ) = a(i  ) * log( 1 + dt./T(1) ); % logarithmic transient 1
