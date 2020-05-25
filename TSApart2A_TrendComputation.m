@@ -49,13 +49,13 @@ doSaveResults = false; % save pngs and result files
 % stationname = 'PBJP';
 
 % stationname = '21701S007A03'; % KSMV %[ok]
-% stationname = '21702M002A07'; % MIZU %[ok]
+stationname = '21702M002A07'; % MIZU %[ok]
 % stationname = '21729S007A04'; % USUDA %[ok]
 % stationname = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationname = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationname = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
 % stationname = '41705M003A04'; % Santiago %[ok, doeqjumps]
-stationname = '41719M004A02'; % Concepcion %[ok]
+% stationname = '41719M004A02'; % Concepcion %[ok]
 
 %%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Polynomial Trend: Degree
@@ -76,12 +76,13 @@ W = 2*pi./P;
 % earthquake events (jumps)
 T = years(days(10));
 % vector mapping different T (tau) relaxation coefficients
-tauVec1 = years(days(1:10:200));
-tauVec2 = years(days(201:30:365));
+tauVec1 = years(days(1:10:120));
+tauVec2 = years(days(201:30:730));
+% tauVec2=[]; % only 1 transient
 
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
 doITRFjump = false; % E - N - U
-doEQjump = false;
+doEQjump = true;
 
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
 KK = 0; % n of iterations for IRLS
@@ -190,7 +191,7 @@ writeInputLog(fID, stationname, data{:, 'date'}, ...
 nPolynTerms = polynDeg + 1; % 0, 1, 2, ...
 nOscParam = length(W) * 2; % cos & sin components (C, S) for every oscillation
 nJumps = length(HJumps); % All Jumps - From DB and ITRF (if set to true)
-nEQJumps = length(EQJump) * (size(tauVec1, 1)+size(tauVec1, 1)); % Only EQ Jumps -> n of transients
+nEQJumps = length(EQJump) * (size(tauVec1, 1)+size(tauVec2, 1)); % Only EQ Jumps -> n of transients
 %% Preparation for Trend Estimation
 % set up tau vector
 if ~isempty(tauVec2) % only if two parameters per EQ event

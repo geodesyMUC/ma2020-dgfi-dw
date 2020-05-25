@@ -41,15 +41,18 @@ end
 
 % transient terms
 % T = 1; % T = 1y -> constant
-for i = 1:2:eq_N
-    dt = x - eqjt(round(i/2)); % num coeff!=num eq events
+cnp=1; % counter for eq parameters
+for i = 1:length(eqjt)%2:eq_N
+    dt = x - eqjt(i); % num coeff!=num eq events
     dt(dt < 0) = 0; % Every observation BEFORE the eq event
     % compute
-    yy(:, cnt   ) = a(i  ) * log( 1 + dt./T(1) ); % logarithmic transient 1
-%     yy(:, cnt) = a(i) * (1 - exp(-dt ./ T)); % exponential
-    yy(:, cnt+1 ) = a(i+1) * log( 1 + dt./T(2) ); % logarithmic transient 2
-    % increment counter with number of Tau
-    cnt = cnt + length(T);
+%     yy(:, cnt   )     = a(cnp) * log( 1 + dt./T(1) ); % logarithmic transient 1
+    yy(:, cnt)       = a(cnp  ) * exp( -dt./T(1) ); % exponential 1
+    if length(T)>1
+%         yy(:, cnt+1 ) = a(cnp+1) * log( 1 + dt./T(2) ); % logarithmic transient 2
+        yy(:, cnt+1) = a(cnp+1) * exp( -dt./T(2) ); % exponential 2
+    end
+    cnt = cnt + length(T); % increment counter with number of Tau
 end
 
 % x(t) = term1 + term2 + ... + termCNT
