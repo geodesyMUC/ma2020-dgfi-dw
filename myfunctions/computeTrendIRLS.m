@@ -80,12 +80,12 @@ for i = 1:length(eqjt)
     dt = x - eqjt(i);
     dt(dt < 0) = 0; % Every observation BEFORE the event
     % Transient 1
-%     A(:, N(4)+cnt  ) = log( 1 + dt./T(1) ); % logarithmic transient 1
-    A(:, N(4)+cnt )       = exp(-dt./T(1)); % exponential transient 1
+    A(:, N(4)+cnt  ) = log( 1 + dt./T(1) ); % logarithmic transient 1
+%     A(:, N(4)+cnt )       = exp(-dt./T(1)); % exponential transient 1
     if size(T,2)>1
         % Transient 2
-%         A(:, N(4)+cnt+1 ) = log( 1 + dt./T(2) ); % logarithmic transient 2
-        A(:, N(4)+cnt+1 ) = exp(-dt./T(2)); % exponential transient 2
+        A(:, N(4)+cnt+1 ) = log( 1 + dt./T(2) ); % logarithmic transient 2
+%         A(:, N(4)+cnt+1 ) = exp(-dt./T(2)); % exponential transient 2
     end
     cnt=cnt+length(T);
 end

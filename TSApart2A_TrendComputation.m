@@ -49,18 +49,18 @@ doSaveResults = false; % save pngs and result files
 % stationname = 'PBJP';
 
 % stationname = '21701S007A03'; % KSMV %[ok]
-stationname = '21702M002A07'; % MIZU %[ok]
+% stationname = '21702M002A07'; % MIZU %[ok]
 % stationname = '21729S007A04'; % USUDA %[ok]
 % stationname = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationname = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
-% stationname = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
+stationname = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
 % stationname = '41705M003A04'; % Santiago %[ok, doeqjumps]
 % stationname = '41719M004A02'; % Concepcion %[ok]
 
 %%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Polynomial Trend: Degree
-polynDeg = -1; % integer degree number
-% polynDeg = 2;
+% polynDeg = -1; % integer degree number
+polynDeg = 2;
 % polynDeg = 3;
 
 % periods / oscillations in YEARS (=365.25 days) in vector form
@@ -76,7 +76,7 @@ W = 2*pi./P;
 % earthquake events (jumps)
 T = years(days(10));
 % vector mapping different T (tau) relaxation coefficients
-tauVec1 = years(days(1:10:120));
+tauVec1 = years(days(1:15:200));
 tauVec2 = years(days(201:30:730));
 % tauVec2=[]; % only 1 transient
 
