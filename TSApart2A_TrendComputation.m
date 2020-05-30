@@ -49,7 +49,7 @@ doSaveResults = false; % save pngs and result files
 % stationname = 'PBJP';
 
 % stationname = '21701S007A03'; % KSMV %[ok]
-% stationname = '21702M002A07'; % MIZU %[ok]
+stationname = '21702M002A07'; % MIZU %[ok]
 % stationname = '21729S007A04'; % USUDA %[ok]
 % stationname = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationname = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
