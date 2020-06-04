@@ -1,12 +1,12 @@
-function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, nPolyn, W, jt, eqjt, T, KK, p, outl_factor)
-% IRLSE - 
+function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, polynDeg, W, j_t, ts_t, tau, KK, p, outl_factor)
+% IRLSE - Iterative Reweighted (Linear) Least Squares
 % INPUT
 %   x: vector containing time stamps in [SECONDS] relative to t0
 %   b: vector containing observations
-%   nPolyn: integer power of polynome denoting station velocity
+%   polynDeg: integer power of polynome denoting station velocity
 %   w: vector containing periods in [RAD]
-%   jt: vector containing jump times in [SECONDS] relative to t0 (if not specified -> empty)
-%   eqjt: vector containing jump times for earthquakes in [SECONDS] relative to t0 (if not specified -> empty)
+%   j_t: vector containing jump times in [SECONDS] relative to t0 (if not specified -> empty)
+%   ts_t: vector containing transient times for earthquakes in [SECONDS] relative to t0 (if not specified -> empty)
 %   (Note: t0 refers to the datetime of the first observation in the time series)
 %   T: Logarithmic Transient Parameter in [YEARS], will be set to 1 if not specified
 %   KK: number of iterations for IRLS
@@ -26,21 +26,21 @@ fprintf('n of iterations for IRLS = %d,\np of L_p Norm for IRLS = %.2f,\nOutlier
     KK, p, outl_factor);
 
 if nargin == 6 || nargin == 9
-    T = 1; % assign default value 1y for logar. transient parameter T
+    tau = 1; % assign default value 1y for logar. transient parameter T
 end
 
 % convert datetimes from [seconds] to [years]
 x = years(seconds(x));       % x./(365.25 * 86400);
-jt = years(seconds(jt));      % jt./(365.25 * 86400);
-eqjt = years(seconds(eqjt));    % eqjt./(365.25 * 86400);
+j_t = years(seconds(j_t));      % jt./(365.25 * 86400);
+ts_t = years(seconds(ts_t));    % eqjt./(365.25 * 86400);
 
 % parameter counts
 nData = length(x); % number of observations
-nPolynTerms = nPolyn+1; % 0, 1, 2, ... 
+nPolynTerms = polynDeg+1; % 0, 1, 2, ... 
 nPeriodic = length(W); % oscillations
 nPeriodicCoeff = nPeriodic*2; % cos & sin components (C, S) for every oscillation
-nJumpCoeff = length(jt); % All Jumps - From DB and ITRF (if set to true)
-nEqParam = length(eqjt)*length(T); % number of eq jumps -> transient * number of T
+nJumpCoeff = length(j_t); % All Jumps - From DB and ITRF (if set to true)
+nEqParam = length(ts_t)*length(tau); % number of eq jumps -> transient * number of T
 
 % Set up Map N: n of Parameter Storage Vector
 N(1) = 0;
@@ -54,7 +54,7 @@ A = zeros(nData, N(5)); % initialize (measurements x unknown parameters)
 fprintf('Design Matrix A: %d x %d\n', size(A, 1), size(A, 2));
 
 % 1:POLYNOMIAL MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-for i = 0:nPolyn
+for i = 0:polynDeg
     A(:, N(1) + i + 1) = [x.^i]; % Needs +1 because of start at 0
 end
 
@@ -69,25 +69,27 @@ end
 % 3:JUMP MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 for i = 1:nJumpCoeff
     % Heaviside Jump
-    A(:, N(3) + i) = heaviside(x - jt(i));
+    A(:, N(3) + i) = heaviside(x - j_t(i));
 end
 
 % 4:TRANSIENT MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Calculate logarithmic transient for all earthquakes in this TS
 % For every EQ Event, there needs to be (n of Tau) columns
 cnt=1;
-for i = 1:length(eqjt)
-    dt = x - eqjt(i);
+for i = 1:length(ts_t)
+    dt = x - ts_t(i);
     dt(dt < 0) = 0; % Every observation BEFORE the event
-    % Transient 1
-    A(:, N(4)+cnt  ) = log( 1 + dt./T(1) ); % logarithmic transient 1
-%     A(:, N(4)+cnt )       = exp(-dt./T(1)); % exponential transient 1
-    if size(T,2)>1
-        % Transient 2
-        A(:, N(4)+cnt+1 ) = log( 1 + dt./T(2) ); % logarithmic transient 2
-%         A(:, N(4)+cnt+1 ) = exp(-dt./T(2)); % exponential transient 2
+    if size(tau,2)>0
+        % Transient 1
+        A(:, N(4)+cnt  ) = log( 1 + dt./tau(1) ); % logarithmic transient 1
+        %     A(:, N(4)+cnt )       = exp(-dt./T(1)); % exponential transient 1
+        if size(tau,2)>1
+            % Transient 2
+            A(:, N(4)+cnt+1 ) = log( 1 + dt./tau(2) ); % logarithmic transient 2
+            %         A(:, N(4)+cnt+1 ) = exp(-dt./T(2)); % exponential transient 2
+        end
     end
-    cnt=cnt+length(T);
+    cnt=cnt+length(tau);
 end
 
 %% (1) Calculate initial parameters xEst from A, b
@@ -187,8 +189,8 @@ xSim = min(x) : tInterpolation : max(x); % interpolation
 xSim = x'; % original values, no interpolation
 % call function
 % creates y values (e.g. up values) for "simulated" time series
-y = TimeFunction(xSim, polynParam, periodicParam, W, jt, jumpParam, ...
-    eqjt, EQtransient, T);
+y = TimeFunction(xSim, polynParam, periodicParam, W, j_t, jumpParam, ...
+    ts_t, EQtransient, tau);
 % y = A * xEst;
 end
 

@@ -58,12 +58,11 @@ stationName = '21701S007A03'; % KSMV %[ok]
 % stationName = '41719M004A02'; % Concepcion %[ok]
 
 %%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Polynomial Trend: Integer Degree, Range [-1,0,1,2,3]
-polynDeg = [-1, -1, -1];
+polynDeg = [-1, -1, -1];    % Polynomial Trend: Integer Degree, Range [-1,0,1,2,3]
+
 
 % periods / oscillations in YEARS (=365.25 days) in vector form
-% common values: 0.5, 1
-osc = {[], [], []};
+osc = {[], [], []};         % common values: 0.5, 1
 
 % Parameter tau in [years] for computation of logarithmic transient for
 % earthquake events (jumps):
@@ -72,18 +71,30 @@ tauVec1 = years(days(1:15:200));
 tauVec2 = years(days(201:30:730));
 % tauVec2=[]; % only 1 transient
 
+% % specify type of transient: "log","exp","nil"
+% transientType = {...
+%     'log','log'; ...    % coordinate1:E|X
+%     'log','log'; ...    % coordinate2:N|Y
+%     'log','log'};       % coordinate3:U|Z
+
+% specify type of transient: "log","exp","nil"
+transientType = {...
+    'log','log'; ...    % coordinate1:E|X
+    'log','log'; ...    % coordinate2:N|Y
+    'log','log'};       % coordinate3:U|Z
+
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
-doITRFjump = [false false false]; % E - N - U
-doEQjump = [false false false];
+doITRFjump  = [false false false]; % E-N-U
+doEQjump    = [false false false]; % E-N-U
 
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
-KK = 0; % n of iterations for IRLS
-p = 2.0; % L_p Norm for IRLS
-outlFactor = 100; % median(error) + standard deviation * factor -> outlier
+KK = 0;             % n of iterations for IRLS
+p = 2.0;            % L_p Norm for IRLS
+outlFactor = 100;   % median(error) + standard deviation * factor -> outlier
 
 % other variables
-coordinateName = {'E [mm]', 'N [mm]', 'U [mm]'}; % used to label plots
-% coordinateName = {'X [mm] rel. to x_1', 'Y [mm] rel. to y_1', 'Z [mm] rel. to z_1'}; % used to label plots
+coordinateName    = {'E [mm]', 'N [mm]', 'U [mm]'}; % used to label plots
+% coordinateName    = {'X [mm] rel. to x_1', 'Y [mm] rel. to y_1', 'Z [mm] rel. to z_1'}; % used to label plots
 jumpCategoryNames = {'Earthquake', 'SW/HW-Change', 'Unknown'}; % corresponds to jump table columns
 
 %%% Output %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -143,7 +154,7 @@ oscW = cellfun(@(x) 2*pi./x, osc, 'UniformOutput', false);
 
 % preallocate
 heavJumps  = cell(3,1); % Heaviside Jump cells for the 3 coordinates E,N,U
-transients = cell(3,1); % Transient cells for the 3 coordinates E,N,U
+transients = cell(3,1); % Transient cells for the 3 coordinates E,N,U 
 
 % load tables
 % Distinguish between EQs (invokes transient) and other jumps (do not invoke transient)
@@ -170,8 +181,8 @@ end
 
 % preallocate cell arrays for output
 result_parameters = cell(3, 2);
-outlier_logicals = cell(3, 1);
-outlier_logicals = cellfun(@(x) zeros(length(t), 1), outlier_logicals, 'UniformOutput', false); % workaround for no outliers
+outlier_logicals  = cell(3, 1);
+outlier_logicals  = cellfun(@(x) zeros(length(t), 1), outlier_logicals, 'UniformOutput', false); % workaround for no outliers
 
 % create datetime array with equal date intervals (1d)
 tInterpolV =  data{:, 'date'}; % verify integrity of algorithm COMMENT
@@ -182,12 +193,25 @@ dateIntvlN = length(tInterpolV);
 trenddata = [];
 
 % generate tau vector for transients containing all combinations
-if ~isempty(tauVec2) % if two parameters per EQ event
-    [tauGrid1, TauGrid2] = meshgrid(tauVec1, tauVec2); % create two grids
-    tauGrid = cat(2, tauGrid1, TauGrid2); % cat along 2nd dimension
-    tauVec = reshape(tauGrid, [], 2); % reshape to 2 col vector with rows (tau1, tau2)
-else % if only 1 parameter tau per EQ event
-    tauVec = tauVec1';
+tsFctStr = {'log','exp'};
+tauCell = cell(3,1);
+for i = 1:3 % E-N-U
+    if      any(strcmp( transientType{i,1} , tsFctStr )) &&  any(strcmp( transientType{i,2} , tsFctStr ))
+        [tauGrid1, ...
+            TauGrid2] = meshgrid(tauVec1, tauVec2); % create two grids
+        tauGrid       = cat(2, tauGrid1, TauGrid2); % cat along 2nd dimension
+        tauVec = reshape(tauGrid, [], 2);           % reshape to 2 col vector with rows (tau1, tau2)
+        tauCell{i} = num2cell(tauVec,2);
+    elseif  any(strcmp( transientType{i,1} , tsFctStr )) && ~any(strcmp( transientType{i,2} , tsFctStr ))
+        tauVec        = tauVec1';
+        tauCell{i} = num2cell(tauVec,2);
+    elseif ~any(strcmp( transientType{i,1} , tsFctStr )) &&  any(strcmp( transientType{i,2} , tsFctStr ))
+        tauVec        = tauVec2';
+        tauCell{i} = num2cell(tauVec,2);
+    else % no match found, no transient to be estimated
+        tauCell{i} = {[]};
+    end
+%     tauCell{i} = tauVec;
 end
 
 % other variables - get count of params (poly,osc, jumps, transients) per coordinate
@@ -195,14 +219,14 @@ for i = 1:3 % E-N-U
     nPolynTerms(i) = polynDeg(i) + 1; % 0, 1, 2, ...
     nOscParam(i)   = length(oscW{i}) * 2; % cos & sin components (C, S) for every oscillation
     nJumps(i)      = length(heavJumps{i}); % All Jumps - From DB and ITRF (if set to true)
-    nTransients(i) = length(transients{i}) * (size(tauVec1, 1)+size(tauVec2, 1)); % Only EQ Jumps -> n of transients
+    nTransients(i) = length(transients{i}) * (size(tauCell{i}{1},2)); % Only EQ Jumps -> n of transients
 end
 
 % prepare array to store results rms,wrms,est.params FOR EVERY COMBINATION
 % OF TAU (rows) and E,N,U (cols)
 resultCell = cell(3,1);
 for i = 1:3 % E-N-U
-    resultCell{i} = zeros(size(tauVec,1), 2+nPolynTerms(i)+nOscParam(i)+nJumps(i)+nTransients(i) );
+    resultCell{i} = zeros(size(tauCell{i},1), 2+nPolynTerms(i)+nOscParam(i)+nJumps(i)+nTransients(i) );
 end
 
 %% Write Input Parameters to log file
@@ -211,9 +235,9 @@ for i = 1:3 % E-N-U
         polynDeg(i), osc{i}, heavJumps{i}, transients{i}, KK, p, outlFactor);
 end
 
-%% Parameter Estimation 
-for i = 1:length(tauVec) % Loop all combinations of tau values
-    for j = 1:3 % E-N-U   
+%% Parameter Estimation
+for j = 1:3 % E-N-U
+    for i = 1:length(tauCell{j})
         % LSE to get approximate parameters x0
         fprintf('Evaluating "%s" ...\n', coordinateName{j});
         [y, result_parameterC, xEst, ~] = computeTrendIRLS(... % trend, rms/wrms, parameters, outlier logical
@@ -223,63 +247,72 @@ for i = 1:length(tauVec) % Loop all combinations of tau values
             oscW{j}, ...  % periods
             heavJumps{j}, ...  % jumps: time in years since t0
             transients{j}, ... % eqs jumps: time in years since t0
-            tauVec(i, :), ... %  logar. transient parameter T for earthquakes
+            tauCell{j}{i}, ... %  logar. transient parameter T for earthquakes
             KK, ... % n of iterations for IRLS
             p, ... % L_p Norm for IRLS
             outlFactor); % median(error) + standard deviation * factor -> outlier
         % results: [RMS,WRMS,Params]
-        resultCell{j}(i,:) = [result_parameterC{1,2}, result_parameterC{1,2}, xEst'];        
+        resultCell{j}(i,:) = [result_parameterC{1,2}, result_parameterC{1,2}, xEst'];
     end
 end
-% create map plot
+
+% get best solution: min RMS (idx)
+[~, EMinIdx]    = min( resultCell{1}(:,1) );
+[~, NMinIdx]    = min( resultCell{2}(:,1) );
+[~, UMinIdx]    = min( resultCell{3}(:,1) );
+if length(tauCell{1})==length(tauCell{2})
+    [~, ENMinIdx]   = min(sum( [resultCell{1}(:,1), resultCell{2}(:,1)],2));
+    if length(tauCell{1})==length(tauCell{2}) &&  ...
+            length(tauCell{1})==length(tauCell{3})
+        [~, TotalMinIdx]= min(sum( [resultCell{1}(:,1), resultCell{2}(:,1), resultCell{3}(:,1)] ,2));
+    end
+end
+BestIdx = [EMinIdx NMinIdx UMinIdx]; % can be adapted
+
+% compute time series based on found solution for ENU
 for i = 1:3 % E-N-U
-    if isempty(tauVec2)
+    trenddata(:, i) = TimeFunction(years(seconds(t)), ...
+        resultCell{i}(BestIdx(i), 3 : 3+nPolynTerms(i)-1 ), ...
+        [], [], ... % TO BE IMPLEMENTED: OSCILLATIONS
+        years(seconds(heavJumps{i})), ...
+        resultCell{i}(BestIdx(i), 3+nPolynTerms(i)+nOscParam(i) : 3+nPolynTerms(i)+nOscParam(i)+nJumps(i)-1), ...
+        years(seconds(transients{i})), ...
+        resultCell{i}(BestIdx(i), 3+nPolynTerms(i)+nOscParam(i)+nJumps(i) : end), ...
+        tauCell{i}{BestIdx(i)}...
+        );
+end
+
+% create map plot for tau
+for i = 1:3 % E-N-U
+    if size(tauCell{i}{1},2) == 1       % 1 tau
         figure
-        plot(days(years(tauVec)), resultCell{i}(:,1) )
+        plot(days(years( cell2mat(tauCell{i}) )) , resultCell{i}(:,1) )
         xlabel('\tau_{log} [days]')
         ylabel('rms [mm]')
-        title(coordinateName{i})
-    elseif ~isempty(tauVec2)
+        title(["\tau parameter space for ", coordinateName{i}])
+    elseif size(tauCell{i}{1},2) == 2   % 2 tau
         resultGrid = reshape(resultCell{i}(:,1), length(tauVec2), length(tauVec1) );
         figure
         colormap(flipud(parula)) % low error = good
         contourf(days(years(tauVec1)),days(years(tauVec2)),resultGrid);
         xlabel('\tau_{log1}SHORT [days]')
         ylabel('\tau_{log2}LONG [days]')
+        title(["\tau parameter space for ", coordinateName{i}])
         c = colorbar;
         c.Label.String = 'RMS';
     end
-end
-% get best solution: min RMS (idx)
-[~, EMinIdx]    = min( resultCell{1}(:,1) );
-[~, NMinIdx]    = min( resultCell{2}(:,1) );
-[~, UMinIdx]    = min( resultCell{3}(:,1) );
-[~, ENMinIdx]   = min(sum( [resultCell{1}(:,1), resultCell{2}(:,1)]                     ,2));
-[~, TotalMinIdx]= min(sum( [resultCell{1}(:,1), resultCell{2}(:,1), resultCell{3}(:,1)] ,2));
-
-% compute time series based on found solution for ENU
-for i = 1:3 % E-N-U
-    trenddata(:, i) = TimeFunction(years(seconds(t)), ...
-        resultCell{i}(ENMinIdx, 3 : 3+nPolynTerms(i)-1 ), ...
-        [], [], ... % TO BE IMPLEMENTED: OSCILLATIONS
-        years(seconds(heavJumps{i})), ...
-        resultCell{i}(ENMinIdx, 3+nPolynTerms(i)+nOscParam(i) : 3+nPolynTerms(i)+nOscParam(i)+nJumps(i)-1), ...
-        years(seconds(transients{i})), ...
-        resultCell{i}(ENMinIdx, 3+nPolynTerms(i)+nOscParam(i)+nJumps(i) : end), ...
-        tauVec(ENMinIdx, :));
 end
 
 % save results, write logs
 for i = 1:3 % E-N-U
     result_parameters{i, 1} = coordinateName{i};
     result_parameters{i, 2} = ...
-        {'rms', resultCell{i}(ENMinIdx,1); 'wrms', resultCell{i}(ENMinIdx,2)}; % assign parameter cell to super cell
+        {'rms', resultCell{i}(BestIdx(i),1); 'wrms', resultCell{i}(BestIdx(i),2)}; % assign parameter cell to super cell
 end
-% writeOutputLog(fID, [stationname, '-', coordinateSTR{j}], xEst, ...
-%     polynDeg, P, HJumps, EQJump, results{1, 2}, results{2, 2})
-% outlier_logicals{j} = outlierLogical; % 1: suspected outlier measurements, computed in IRLS function
-
-% continue evaluation of found solution
+% needs rework!!
+% % writeOutputLog(fID, [stationname, '-', coordinateSTR{j}], xEst, ...
+% %     polynDeg, P, HJumps, EQJump, results{1, 2}, results{2, 2})
+% % outlier_logicals{j} = outlierLogical; % 1: suspected outlier measurements, computed in IRLS function
 
 fclose(fID); % close log file
 fprintf('Calculation finished.\nPlotting and writing results ...\n')
@@ -310,6 +343,7 @@ for i = 1:3 % E-N-U
         result_parameters{i,2}{2,2}, result_parameters{i,2}{2,2}); % rms&wrms
 end
 
+% visualize time series and results
 figTSA = figure;
 VisualizeTS_Trend_Outliers_ITRF_ENU(...
     data{:, 'date'}, [data{:, 3}, data{:, 4}, data{:, 5}], outlier_logicals, coordinateName, ...
@@ -321,13 +355,15 @@ VisualizeTS_Trend_Outliers_ITRF_ENU(...
     readITRFChanges(itrfChangesTextfile)...
     )
 
-% set(gcf, 'InnerPosition', [0 0 604 513]);
+% set(gcf, 'InnerPosition', [0 0 604 513]); % small figure
 set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
 
-%% PRINT PLOT
-plot_title = [stationName, '-trend.png'];
-plot_dir = 'stationTSA_dailyXYZfiles_xyz_plots';
-if doSaveResults; saveas(figTSA, fullfile(plot_dir, plot_title)); end% Save figure as image file
+% PRINT PLOT
+if doSaveResults % Save figure as image file
+    plot_title = [stationName, '-trend.png'];
+    plot_dir = 'stationTSA_dailyXYZfiles_xyz_plots';
+    saveas(figTSA, fullfile(plot_dir, plot_title));
+end 
 
 %%
 fprintf('Done!\n')

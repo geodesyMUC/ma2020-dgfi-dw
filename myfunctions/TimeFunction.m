@@ -45,12 +45,14 @@ cnp=1; % counter for eq parameters
 for i = 1:length(eqjt)%2:eq_N
     dt = x - eqjt(i); % num coeff!=num eq events
     dt(dt < 0) = 0; % Every observation BEFORE the eq event
-    % compute
-    yy(:, cnt   )     = a(cnp) * log( 1 + dt./T(1) ); % logarithmic transient 1
-%     yy(:, cnt)       = a(cnp  ) * exp( -dt./T(1) ); % exponential 1
-    if length(T)>1
-        yy(:, cnt+1 ) = a(cnp+1) * log( 1 + dt./T(2) ); % logarithmic transient 2
-%         yy(:, cnt+1) = a(cnp+1) * exp( -dt./T(2) ); % exponential 2
+    if ~isempty(T)
+        % compute
+        yy(:, cnt   )     = a(cnp) * log( 1 + dt./T(1) ); % logarithmic transient 1
+        %     yy(:, cnt)       = a(cnp  ) * exp( -dt./T(1) ); % exponential 1
+        if length(T)>1
+            yy(:, cnt+1 ) = a(cnp+1) * log( 1 + dt./T(2) ); % logarithmic transient 2
+            %         yy(:, cnt+1) = a(cnp+1) * exp( -dt./T(2) ); % exponential 2
+        end
     end
     cnp = cnp + length(T);
     cnt = cnt + length(T); % increment counter with number of Tau
