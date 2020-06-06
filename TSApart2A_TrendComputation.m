@@ -33,7 +33,7 @@ addpath('myfunctions')
 inputFolder = 'station_data_dailyXYZfiles'; % Where Station Data (TSA_ReadAndTransform) is stored as ".mat"
 jumpCSVLocation = 'src/jumps_dailyXYZfiles.csv'; % Location of Jump Table/Jump Database
 itrfChangesTextfile = 'src/itrf_changes.txt';
-doSaveResults = false; % save pngs and result files
+doSaveResults = true; % save pngs and result files
 %%% Name of station to be analysed %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SELECTION FOR ANALYSIS
 
@@ -48,45 +48,36 @@ doSaveResults = false; % save pngs and result files
 % stationName = 'RWSN'; % Rawson, Argentina
 % stationName = 'PBJP';
 
-stationName = '21701S007A03'; % KSMV %[ok]
+% stationName = '21701S007A03'; % KSMV %[ok]
 % stationName = '21702M002A07'; % MIZU %[ok]
 % stationName = '21729S007A04'; % USUDA %[ok]
 % stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
-% stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
+stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
 % stationName = '41719M004A02'; % Concepcion %[ok]
 
 %%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-polynDeg = [-1, -1, -1];    % Polynomial Trend: Integer Degree, Range [-1,0,1,2,3]
-
-
+polynDeg = [1, 1, -1];% Polynomial Trend,Integer Degree, Range [-1..3]
 % periods / oscillations in YEARS (=365.25 days) in vector form
-osc = {[], [], []};         % common values: 0.5, 1
-
-% Parameter tau in [years] for computation of logarithmic transient for
-% earthquake events (jumps):
-% vector mapping different T (tau) relaxation coefficients
-tauVec1 = years(days(1:15:200));
-tauVec2 = years(days(201:30:730));
-% tauVec2=[]; % only 1 transient
-
+osc = {[1], [1], []};     % common values: 0.5y, 1y
+% Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
+doITRFjump  = [false false false]; % E-N-U
+doEQjump    = [true true true]; % E-N-U
 % specify type of transient: "log","exp","nil"
 transientType = {...
     'log','log'; ...    % coordinate1:E|X
     'log','log'; ...    % coordinate2:N|Y
     'log','log'};       % coordinate3:U|Z
 
-% % specify type of transient: "log","exp","nil"
-% transientType = {...
-%     'exp','nil'; ...    % coordinate1:E|X
-%     'exp','nil'; ...    % coordinate2:N|Y
-%     'exp','nil'};       % coordinate3:U|Z
-
-% Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
-doITRFjump  = [false false false]; % E-N-U
-doEQjump    = [true true true]; % E-N-U
-
+% Parameter tau in [years] for computation of logarithmic transient for
+% earthquake events (jumps):
+% vector mapping different T (tau) relaxation coefficients
+tauVec1 = years(days(1:15:180));
+tauVec2 = years(days(231:30:730));
+% tauVec1 = years(days(100));
+% tauVec2 = years(days(365));
+% tauVec2=[]; % only 1 transient
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
 KK = 0;             % n of iterations for IRLS
 p = 2.0;            % L_p Norm for IRLS
@@ -277,9 +268,12 @@ BestIdx = [EMinIdx NMinIdx UMinIdx]; % can be adapted
 
 % compute time series based on found solution for ENU
 for i = 1:3 % E-N-U
+    oscCS = resultCell{i}(BestIdx(i), 3+nPolynTerms(i) : 3+nPolynTerms(i)+nOscParam(i)-1);
+    oscCS = [oscCS(1:2:end); oscCS(2:2:end)]; % reorder cosine/sine components
     trenddata(:, i) = TimeFunction(years(seconds(t)), ...
         resultCell{i}(BestIdx(i), 3 : 3+nPolynTerms(i)-1 ), ...
-        [], [], ... % TO BE IMPLEMENTED: OSCILLATIONS
+        oscCS, ... % rearranged oscillation amplitudes (cosine, sine)
+        osc{i}, ... % periods
         years(seconds(heavJumps{i})), ...
         resultCell{i}(BestIdx(i), 3+nPolynTerms(i)+nOscParam(i) : 3+nPolynTerms(i)+nOscParam(i)+nJumps(i)-1), ...
         years(seconds(transients{i})), ...
@@ -291,13 +285,13 @@ end
 
 % create map plot for tau
 for i = 1:3 % E-N-U
-    if size(tauCell{i}{1},2) == 1       % 1 tau
+    if size(tauCell{i}{1},2) == 1 % 1 tau
         figure
         plot(days(years( cell2mat(tauCell{i}) )) , resultCell{i}(:,1) )
         xlabel('\tau_{log} [days]')
         ylabel('rms [mm]')
         title(["\tau parameter space for ", coordinateName{i}])
-    elseif size(tauCell{i}{1},2) == 2   % 2 tau
+    elseif size(tauCell{i}{1},2) == 2 && length(tauVec1)>1 && length(tauVec2)>1  % 2 tau
         resultGrid = reshape(resultCell{i}(:,1), length(tauVec2), length(tauVec1) );
         figure
         colormap(flipud(parula)) % low error = good
@@ -344,6 +338,7 @@ if doSaveResults; csvwrite(resultSaveFile, resultM); end% R2006
 titleString = cell(3, 1); % preallocate
 for i = 1:3 % E-N-U
     % set up plot title
+    if isempty(transientType{i,1}) && isempty(transientType{i,2});transientType{i,1}='none';end
     titleString{i} = sprintf('Station:"%s" Transient:%s jump(itrf):%s  jump(eq):%s  RMS=%.2fmm WRMS=%.2fmm', ...
         stationName, sprintf('%s %s', transientType{i,1},transientType{i,2}),...
         mat2str(doITRFjump(i)), ...
@@ -362,7 +357,24 @@ VisualizeTS_Trend_Outliers_ITRF_ENU(...
     jumpCategoryNames, ...
     readITRFChanges(itrfChangesTextfile)...
     )
+% set(gcf, 'InnerPosition', [0 0 604 513]); % small figure
+set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
 
+% visualize residuals
+figRes = figure;
+VisualizeResiduals(...
+    data{:, 'date'}, [...
+    data{:, 3}-trenddata(:,1), ... % E residuals
+    data{:, 4}-trenddata(:,2), ... % N residuals
+    data{:, 5}-trenddata(:,3)], ...% U residuals
+    outlier_logicals, ...
+    cellfun(@(x) ['Residual \Delta',x],coordinateName,'UniformOutput',false), ...
+    titleString, ...
+    currStationJumps{:, 'Date'}, ...
+    [currStationJumps{:, 'Earthquake'}, currStationJumps{:, 'HWSW_Change'}, currStationJumps{:, 'Unknown'}], ...
+    jumpCategoryNames, ...
+    readITRFChanges(itrfChangesTextfile)...
+    )
 % set(gcf, 'InnerPosition', [0 0 604 513]); % small figure
 set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
 
@@ -371,6 +383,13 @@ if doSaveResults % Save figure as image file
     plot_title = [stationName, '-trend.png'];
     plot_dir = 'stationTSA_dailyXYZfiles_xyz_plots';
     saveas(figTSA, fullfile(plot_dir, plot_title));
+end
+
+% PRINT PLOT
+if doSaveResults % Save figure as image file
+    plot_title = [stationName, '-residuals.png'];
+    plot_dir = 'stationTSA_dailyXYZfiles_xyz_plots';
+    saveas(figRes, fullfile(plot_dir, plot_title));
 end 
 
 %%
