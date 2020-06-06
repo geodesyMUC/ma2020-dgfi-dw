@@ -1,12 +1,12 @@
-function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, nPolyn, W, jt, eqjt, T, KK, p, outl_factor)
-% IRLSE - 
+function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, polynDeg, W, j_t, ts_t, tau, transType, KK, p, outl_factor)
+% IRLSE - Iterative Reweighted (Linear) Least Squares
 % INPUT
 %   x: vector containing time stamps in [SECONDS] relative to t0
 %   b: vector containing observations
-%   nPolyn: integer power of polynome denoting station velocity
+%   polynDeg: integer power of polynome denoting station velocity
 %   w: vector containing periods in [RAD]
-%   jt: vector containing jump times in [SECONDS] relative to t0 (if not specified -> empty)
-%   eqjt: vector containing jump times for earthquakes in [SECONDS] relative to t0 (if not specified -> empty)
+%   j_t: vector containing jump times in [SECONDS] relative to t0 (if not specified -> empty)
+%   ts_t: vector containing transient times for earthquakes in [SECONDS] relative to t0 (if not specified -> empty)
 %   (Note: t0 refers to the datetime of the first observation in the time series)
 %   T: Logarithmic Transient Parameter in [YEARS], will be set to 1 if not specified
 %   KK: number of iterations for IRLS
@@ -14,72 +14,88 @@ function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, nPolyn, W, 
 %   If p=2, no reweighting will be applied, independent of the number of iterations KK
 %   outl_factor: median(error)|mean(error) + standard deviation * factor -> outlier
 
-if nargin <= 7
+if nargin <= 8
     % Additional Parameters (default values)
     KK = 0; % n of iterations for IRLS
     p = 2.0; % L_p Norm for IRLS
-    outl_factor = 4; % median(error) + standard deviation * factor -> outlier
+    outl_factor = 5; % median(error) + standard deviation * factor -> outlier
     fprintf('No IRLS parameters defined. Calculating L2 norm LSE.\n')
 end
 
 fprintf('n of iterations for IRLS = %d,\np of L_p Norm for IRLS = %.2f,\nOutlier Factor = %d (mean of error + standard deviation * factor < outlier)\n', ...
     KK, p, outl_factor);
 
-if nargin == 6 || nargin == 9
-    T = 1; % assign default value 1y for logar. transient parameter T
+if length(tau) ~= size(transType,1)
+    error('length of tau vector for transients does not match length of type of tau vector')
 end
 
-% convert datetimes to from [seconds] to [years]
+% convert datetimes from [seconds] to [years]
 x = years(seconds(x));       % x./(365.25 * 86400);
-jt = years(seconds(jt));      % jt./(365.25 * 86400);
-eqjt = years(seconds(eqjt));    % eqjt./(365.25 * 86400);
+j_t = years(seconds(j_t));      % jt./(365.25 * 86400);
+ts_t = years(seconds(ts_t));    % eqjt./(365.25 * 86400);
 
 % parameter counts
 nData = length(x); % number of observations
-nPolynTerms = nPolyn + 1; % 0, 1, 2, ... 
+nPolynTerms = polynDeg+1; % 0, 1, 2, ... 
 nPeriodic = length(W); % oscillations
-nPeriodicCoeff = nPeriodic * 2; % cos & sin components (C, S) for every oscillation
-nJumps = length(jt); % All Jumps - From DB and ITRF (if set to true)
-nEqJumps = length(eqjt); % number of eq jumps -> transient
+nPeriodicCoeff = nPeriodic*2; % cos & sin components (C, S) for every oscillation
+nJumpCoeff = length(j_t); % All Jumps - From DB and ITRF (if set to true)
+nEqParam = length(ts_t)*length(tau); % number of eq jumps -> transient * number of T
 
-% Set up Parameter Storage Vector
+% Set up Map N: n of Parameter Storage Vector
 N(1) = 0;
 N(2) = N(1) + nPolynTerms;
 N(3) = N(2) + nPeriodicCoeff;
-N(4) = N(3) + nJumps;
-N(5) = N(4) + nEqJumps;
+N(4) = N(3) + nJumpCoeff;
+N(5) = N(4) + nEqParam;
 
 %% set up design matrix A
 A = zeros(nData, N(5)); % initialize (measurements x unknown parameters)
 fprintf('Design Matrix A: %d x %d\n', size(A, 1), size(A, 2));
 
 % 1:POLYNOMIAL MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-for i = 0:nPolyn
+for i = 0:polynDeg
     A(:, N(1) + i + 1) = [x.^i]; % Needs +1 because of start at 0
 end
 
 % 2:OSCILLATION MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-cnt = 0; % counter for periodic coefficients
+cnt = 1; % counter for periodic coefficients
 
 for i = 1:length(W)
-    A(:, N(2) +  1 + cnt:N(2) +  cnt + 2) = [cos(x * W(i)), sin(x * W(i))];
-    cnt = cnt + 2; % increment to match coefficients
+    A(:, N(2)+cnt:N(2)+cnt+1) = [cos(x * W(i)), sin(x * W(i))];
+    cnt = cnt+2; % increment to match coefficients
 end
 
 % 3:JUMP MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-for i = 1:nJumps
+for i = 1:nJumpCoeff
     % Heaviside Jump
-    A(:, N(3) + i) = heaviside(x - jt(i));
+    A(:, N(3) + i) = heaviside(x - j_t(i));
 end
 
 % 4:TRANSIENT MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Calculate logarithmic transient for all earthquakes in this TS
-for i = 1:nEqJumps
-    dt = x - eqjt(i);
+% For every EQ Event, there needs to be (n of Tau) columns
+cnt=1;
+for i = 1:length(ts_t)
+    dt = x - ts_t(i);
     dt(dt < 0) = 0; % Every observation BEFORE the event
-    % Transient
-    A(:, N(4) + i) = log(1 + dt ./ T); % logarithmic transient
-%     A(:, N(4) + i) = 1 - exp(-dt ./ T); % exponential transient
+    if size(tau,2) > 0
+        % Choose function for Transient 1
+        if strcmp(transType(1,:),'log')
+            A(:, N(4)+cnt  ) = log( 1 + dt./tau(1) ); % logarithmic transient 1
+        elseif strcmp(transType(1,:),'exp')
+            A(:, N(4)+cnt )       = exp(-dt./tau(1)); % exponential transient 1
+        end
+        if size(tau,2) > 1
+            % Choose function for Transient 2
+            if strcmp(transType(2,:),'log')
+                A(:, N(4)+cnt+1 ) = log( 1 + dt./tau(2) ); % logarithmic transient 2
+            elseif strcmp(transType(2,:),'exp')
+                A(:, N(4)+cnt+1 ) = exp(-dt./tau(2)); % exponential transient 2
+            end
+        end
+    end
+    cnt=cnt+length(tau);
 end
 
 %% (1) Calculate initial parameters xEst from A, b
@@ -133,22 +149,22 @@ for k = 1:KK
     
 end
 
-%% (4) QA Plots & Stats
-figure
-plot(0:KK, RMS_vector, 'bx-')
-hold on
-plot(0:KK, WRMS_vector, 'mx-')
-grid on
-title('rms/wrms error')
-xlabel('# Iteration ->')
-ylabel('error [mm]')
-
-figure
-plot(1:KK, E, 'bx-')
-grid on
-title(sprintf('irls error: p norm (p=%.1f)', p))
-ylabel('p norm [mm]')
-xlabel('# Iteration ->')
+% %% (4) QA Plots & Stats
+% figure
+% plot(0:KK, RMS_vector, 'bx-')
+% hold on
+% plot(0:KK, WRMS_vector, 'mx-')
+% grid on
+% title('rms/wrms error')
+% xlabel('# Iteration ->')
+% ylabel('error [mm]')
+% 
+% figure
+% plot(1:KK, E, 'bx-')
+% grid on
+% title(sprintf('irls error: p norm (p=%.1f)', p))
+% ylabel('p norm [mm]')
+% xlabel('# Iteration ->')
 
 % get rms and wrms into result cell for output
 results{1, 1} = 'rms';
@@ -165,24 +181,23 @@ fprintf('WMRS = %.4f, RMS = %.4f\n', wrms, rms);
 
 % Get Polynomial parameters
 polynParam = xEst(N(1) + 1:N(2));
-
 % Get periodic parameters (C&S: cos, sin)
 periodicParam = xEst(N(2) + 1:N(3));
 periodicParam = [periodicParam(1:2:end - 1)'; periodicParam(2:2:end)'];
-
 % Get Jump/Unit Step/Heaviside Parameters
 jumpParam = xEst(N(3) + 1:N(4));
-
 % Get Jump/Unit Step/Heaviside Parameters
 EQtransient = xEst(N(4) + 1:N(5));
 
-% "simulated" time series (equally spaced, depending on time interval)
-xSim = min(x):years(days(1)):max(x); % 1d
-
+% "simulated" time series (equally spaced measurements, depending on time interval)
+tInterpolation = years(days(1)); % interpolation / sampling interval in YEARS
+xSim = min(x) : tInterpolation : max(x); % interpolation
+xSim = x'; % original values, no interpolation
 % call function
 % creates y values (e.g. up values) for "simulated" time series
-y = TimeFunction(xSim, polynParam, periodicParam, W, jt, jumpParam, ...
-    eqjt, EQtransient, T);
+y = TimeFunction(xSim, polynParam, periodicParam, W, j_t, jumpParam, ...
+    ts_t, EQtransient, tau, transType);
+% y = A * xEst;
 end
 
 %% IRLS Custom Functions
@@ -264,56 +279,4 @@ catch
     fprintf('Using Moore-Penrose pseudoinverse for Inversion of normal equation matrix.\n');
     x = pinv(A, 0.001) * B;
 end
-end
-
-function Y = TimeFunction(x, pol, CS, w, jt, b, eqjt, a, T)
-% Creates time series from estimated parameters
-% x: timestamps
-% pol: polynomial coeffiecients
-% CS: cos/sin periodic coefficients
-% w: vector containing periods (rad)
-% shift
-% amplitude of transient
-% relaxation time T
-
-pol_N = length(pol); % number of polynomial coeffiecients
-w_N = length(w); % number of periodic coefficients
-jump_N = length(jt); % number of shifts
-eq_N = length(eqjt); % number of logarithmic transients
-
-yy = zeros(size(x, 2), pol_N + w_N + jump_N + eq_N);
-
-cnt = 1; % counter variable for incremenation
-% polynom terms
-for i = 0:pol_N - 1
-    yy(:, cnt) = pol(i + 1) * x.^(i);
-    cnt = cnt + 1;
-end
-
-% periodic terms
-for i = 1:w_N
-    yy(:, cnt) = CS(1, i) * cos(x * w(i)) + CS(2, i) * sin(x * w(i));
-    cnt = cnt + 1;
-end
-
-% jump terms
-for i = 1:jump_N
-    yy(:, cnt) = b(i) * heaviside(x - jt(i));
-    cnt = cnt + 1;
-end
-
-% transient terms
-% T = 1; % T = 1y -> constant
-for i = 1:eq_N
-    dt = x - eqjt(i);
-    dt(dt < 0) = 0; % Every observation BEFORE the eq event
-    % compute
-    yy(:, cnt) = a(i) * log(1 + dt ./ T); % logarithmic
-%     yy(:, cnt) = a(i) * (1 - exp(-dt ./ T)); % exponential
-    % increment counter
-    cnt = cnt + 1;
-end
-
-% x(t) = term1 + term2 + ... + termCNT
-Y = sum(yy, 2); % row sum -> sum up all terms to compute y
 end

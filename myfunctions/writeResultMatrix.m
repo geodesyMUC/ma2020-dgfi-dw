@@ -9,7 +9,8 @@ resultM = [[200, wrms_enu(1), wrms_enu(2), wrms_enu(3)]; ...
     resultM]; % 200: WRMS (third line)
 resultM = [[100, rms_enu(1), rms_enu(2), rms_enu(3)]; ...
     resultM]; % 100: RMS (second line)
-resultM = [[doITRFjump, KK, p, outl_factor]; resultM]; % LSE parameters (first line)
-
+resultM = [[NaN, KK, p, outl_factor]; resultM]; % LSE parameters (first line)
+% NaN used to be doITRF in previous version, needs fixing since doITRF is
+% vector now
 end
 

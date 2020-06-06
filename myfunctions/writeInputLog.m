@@ -1,7 +1,8 @@
-function [] = writeInputLog(fID, stationname, t, polynDeg, P, HJumps, EQJump, KK, p, outl_factor)
+function [] = writeInputLog(fID, stationname, coordinateName, t, polynDeg, P, HJumps, EQJump, KK, p, outl_factor)
 %writeInputLog writes input parameters to a formatted log file
 %   fID: log file identifier
 %   stationname: name of the station
+%   coordinateName: name of coordinate
 %   t: time series observation datetime vector
 %   polynDeg: integer power of polynome denoting station velocity
 %   P: vector containing periods in [YEARS]
@@ -15,7 +16,7 @@ function [] = writeInputLog(fID, stationname, t, polynDeg, P, HJumps, EQJump, KK
 t0   = t(1);
 tend = t(end);
 
-fprintf(fID, 'Time Series Analysis: Trend for Station "%s" -----------\n', stationname);
+fprintf(fID, 'Time Series Analysis: Trend for Station "%s", Coordinate "%s" -----------\n', stationname, coordinateName);
 fprintf(fID, 'Time Series Start t_0  = %s\n', datestr(t0, 'yyyy-mm-dd HH:MM'));
 fprintf(fID, 'Time Series End t_end  = %s\n\n', datestr(tend, 'yyyy-mm-dd HH:MM'));
 

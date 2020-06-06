@@ -1,5 +1,5 @@
 % Time Series Analysis, Part 2A: MASTER THESIS Nov2019
-% This script reads in station coordinates for a SINGLE station, 
+% This script reads in station coordinates for a SINGLE station,
 % calculates a trend based on the specified parameters to be estimated in a
 % Iteratively Reweighted Least Squares (IRLS) Algorithm
 % (polynome degree, oscillations, jumps, ...) and plots the result.
@@ -19,7 +19,6 @@
 %           Use = 0 (dont use this jump) or 1 (use this jump)
 %
 % David Wallinger, DGFI, 5.8.2019
-% GitHub/GitKraken Test Comment
 
 clear variables;
 close all;
@@ -33,102 +32,100 @@ addpath('myfunctions')
 
 inputFolder = 'station_data_dailyXYZfiles'; % Where Station Data (TSA_ReadAndTransform) is stored as ".mat"
 jumpCSVLocation = 'src/jumps_dailyXYZfiles.csv'; % Location of Jump Table/Jump Database
-itrf_changes_textfile = 'src/itrf_changes.txt';
-
+itrfChangesTextfile = 'src/itrf_changes.txt';
+doSaveResults = true; % save pngs and result files
 %%% Name of station to be analysed %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SELECTION FOR ANALYSIS
 
-% stationname = 'MEXI'; % Mexicali, Mexico
-% stationname = 'ALAR'; % Arapiraca, Brazil
-% stationname = 'AREQ'; % Arequipa, Peru
-% stationname = 'CONZ'; % Concepcion, Chile
-% stationname = 'OAX2'; % Oaxaca, Mexico
-% stationname = 'CUEC'; % Cuenca, Ecuador
-% stationname = 'MZAE'; % Santa Rosa, Argentina (missing jump)
-% stationname = 'NEIL'; % Ciudad Neilly, Costa Rica
-% stationname = 'RWSN'; % Rawson, Argentina
-% stationname = 'PBJP'; 
+% stationName = 'MEXI'; % Mexicali, Mexico
+% stationName = 'ALAR'; % Arapiraca, Brazil
+% stationName = 'AREQ'; % Arequipa, Peru
+% stationName = 'CONZ'; % Concepcion, Chile
+% stationName = 'OAX2'; % Oaxaca, Mexico
+% stationName = 'CUEC'; % Cuenca, Ecuador
+% stationName = 'MZAE'; % Santa Rosa, Argentina (missing jump)
+% stationName = 'NEIL'; % Ciudad Neilly, Costa Rica
+% stationName = 'RWSN'; % Rawson, Argentina
+% stationName = 'PBJP';
 
-stationname = '21701S007A03'; % KSMV
-% stationname = '21702M002A07'; % MIZU
-% stationname = '21729S007A04'; % USUDA
-% stationname = '21754S001A01'; % P-Okushiri - Hokkaido
-% stationname = '21778S001A01'; % P-Kushiro - Hokkaido
-% stationname = '23104M001A01'; % Medan (North Sumatra)
-% stationname = '41705M003A04'; % Santiago
-% stationname = '41719M004A02'; % Concepcion
+% stationName = '21701S007A03'; % KSMV %[ok]
+% stationName = '21702M002A07'; % MIZU %[ok]
+% stationName = '21729S007A04'; % USUDA %[ok]
+% stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
+% stationName = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
+% stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
+stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
+% stationName = '41719M004A02'; % Concepcion %[ok]
 
 %%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Polynomial Trend: Degree
-polynDeg = 1; % integer degree number
-% polynDeg = 2;
-% polynDeg = 3;
-
+polynDeg = [1, 1, -1];% Polynomial Trend,Integer Degree, Range [-1..3]
 % periods / oscillations in YEARS (=365.25 days) in vector form
-P = [];
-% P(1) = 1;
-% P(2) = 1/2;
-% P(3) = 10;
-
-% convert oscillations to angular velocity
-W = 2 * pi ./ P;
-
-% Parameter T in [years] for computation of logarithmic transient for
-% earthquake events (jumps)
-T = 1.00;
-
+osc = {[1], [1], []};     % common values: 0.5y, 1y
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
-doITRFjump = false; % E - N - U
+doITRFjump  = [false false false]; % E-N-U
+doEQjump    = [true true true]; % E-N-U
+% specify type of transient: "log","exp","nil"
+transientType = {...
+    'log','log'; ...    % coordinate1:E|X
+    'log','log'; ...    % coordinate2:N|Y
+    'log','log'};       % coordinate3:U|Z
 
+% Parameter tau in [years] for computation of logarithmic transient for
+% earthquake events (jumps):
+% vector mapping different T (tau) relaxation coefficients
+tauVec1 = years(days(1:15:180));
+tauVec2 = years(days(231:30:730));
+% tauVec1 = years(days(100));
+% tauVec2 = years(days(365));
+% tauVec2=[]; % only 1 transient
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
-KK = 0; % n of iterations for IRLS
-p = 2.0; % L_p Norm for IRLS
-outl_factor = 4; % median(error) + standard deviation * factor -> outlier
+KK = 0;             % n of iterations for IRLS
+p = 2.0;            % L_p Norm for IRLS
+outlFactor = 100;   % median(error) + standard deviation * factor -> outlier
+
+% other variables
+coordinateName    = {'E [mm]', 'N [mm]', 'U [mm]'}; % used to label plots
+% coordinateName    = {'X [mm] rel. to x_1', 'Y [mm] rel. to y_1', 'Z [mm] rel. to z_1'}; % used to label plots
+jumpCategoryNames = {'Earthquake', 'SW/HW-Change', 'Unknown'}; % corresponds to jump table columns
 
 %%% Output %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 logFileFolder = 'TSA_TrendComputationResults'; % output: log file directory
-logFile = [stationname, '_TrendComputation_log.txt']; % output: log file name
+logFile = [stationName, '_TrendComputation_log.txt']; % output: log file name
 
-%% CODE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Log File
 if ~exist(logFileFolder, 'dir')
-   mkdir(logFileFolder)
-   fprintf('Result file storage directory "%s" created.\n', logFileFolder);
+    mkdir(logFileFolder)
+    fprintf('Result file storage directory "%s" created.\n', logFileFolder);
 end
 
 % Open Log File and get identifier
 fID = fopen(fullfile(logFileFolder, logFile), 'wt');
 
-% other variables (constants)
-coordinateSTR = {'E [mm]', 'N [mm]', 'U [mm]'}; % used to label plots
-% coordinateSTR = {'X [mm] rel. to x_1', 'Y [mm] rel. to y_1', 'Z [mm] rel. to z_1'}; % used to label plots
-
-jump_category_names = {'Earthquake', 'SW/HW-Change', 'Unknown'}; % corresponds to jump table columns
-
-%% Select Station Data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Load Station Data
 % look in matched files
 % naming pattern for station measurement data has to be "<StationName>.mat"
-fpathpattern = fullfile(inputFolder, sprintf('%s.mat', stationname)); % match pattern
+fpathpattern = fullfile(inputFolder, sprintf('%s.mat', stationName)); % match pattern
 if exist(fpathpattern, 'file')
     load(fpathpattern)
-    fprintf('Evaluating Station "%s".\n', stationname);
+    fprintf('Evaluating Station "%s".\n', stationName);
 else
-    error('Specified station "%s" - associated .mat-file could not be found!', stationname)
+    error('Specified station "%s" - associated .mat-file could not be found!', stationName)
 end
 
 % Reassign currStation variable
 data = currStation.Data;
-dataSTATION_NAME = currStation.Station;
-% data = sortrows(data, 1); % sort rows according to datetime column ASC
+dataStation = currStation.Station;
+data = sortrows(data, 1); % sort rows according to datetime column ASC
 
 % Load Jump Table using custom import function
 dataJump = importfileJumpCSV(jumpCSVLocation);
 
 % Get jumps for this station
-TFJump = strcmp(dataJump{:, 'Station'}, stationname); % selection logical
-fprintf('%d jumps for this station found.\n', nnz(TFJump));
+isStationJump = strcmp(dataJump{:, 'Station'}, stationName); % selection logical
+fprintf('%d jumps for this station found.\n', nnz(isStationJump));
 
 % All Jumps for current station
-currStationJumps = dataJump(TFJump, :);
+currStationJumps = dataJump(isStationJump, :);
 % All Jumps for current station where "Use" Column Element is set to "1"
 currStationJumps = currStationJumps(currStationJumps.Use == 1, :);
 
@@ -136,135 +133,265 @@ currStationJumps = currStationJumps(currStationJumps.Use == 1, :);
 % Plot TS and Jumps
 figVis = figure;
 % VisualizeTS_ENU(data, dataSTATION_NAME, currStationJumps{:, 2})
-VisualizeTS_ENU2(data, dataSTATION_NAME, currStationJumps{:, 2}, ...
+VisualizeTS_ENU2(data, dataStation, currStationJumps{:, 2}, ...
     'jumpTypes', currStationJumps{:, 4:5});
 
-%% PREPARE PARAMETERS FOR TREND ESTIMATION
-t = data{:, 't'}; % [seconds]; for years, do /(365.25 * 86400);
+%% Prepare Data for LS Estimation
+t  = data{:, 't'}; % [seconds]; for years, do /(365.25 * 86400);
+t  = t-t(1); % adjust for negative t values
 t0 = data{1, 'date'}; % beginning of ts as datetime
+% convert oscillations to angular velocity
+oscW = cellfun(@(x) 2*pi./x, osc, 'UniformOutput', false);
 
-%% Jump table(s)
-HJumps = getRelativeJumps(currStationJumps{:, 2}, t0);
+% preallocate
+heavJumps  = cell(3,1); % Heaviside Jump cells for the 3 coordinates E,N,U
+transients = cell(3,1); % Transient cells for the 3 coordinates E,N,U 
 
-% Distinguish between EQs (invokes log. transient) and other jumps (unknown cause or HW
-% change -> do not invoke transient)
-EQLogical = logical(currStationJumps{:, 4}); % 1:=earthquake; ~1:=no earthquake
-% Get Earthquake Jump Vector - Those Jumps will invoke a log. transient
-EQJump = getRelativeJumps_eq(currStationJumps{:, 2}, t0, EQLogical); 
+% load tables
+% Distinguish between EQs (invokes transient) and other jumps (do not invoke transient)
+eqLogical = logical(currStationJumps{:, 4}); % 1:=earthquake; 0:=no earthquake
+jumps0itrf = getRelativeITRFJumps(t0, itrfChangesTextfile);
 
-%% Add ITRF Realization Change Jumps
-if doITRFjump
-    fprintf('Considering ITRF jumps, doITRFjump is set to "true".\n')
-    
-    jumps0itrf = getRelativeITRFJumps(t0, itrf_changes_textfile);
-    
-    % append itrf jumps to heaviside jumps vector
-    HJumps = [HJumps; jumps0itrf];
-else
-    fprintf('Not considering ITRF jumps, doITRFjump is set to "false".\n')
+% assign tables
+for i = 1:3 % E-N-U
+    % Get Earthquake Transient Vector - Those Jumps will invoke a transient
+    transients{i} = getRelativeJumps_eq(currStationJumps{:, 2}, t0, eqLogical);
+    fprintf('[%s]: doEQjump set to "%s"\n', coordinateName{i}(1), mat2str(doEQjump(i)));
+    if doEQjump(i) % all jumps
+        heavJumps{i} = getRelativeJumps(currStationJumps{:, 2}, t0);
+    else % jumps w/o eq
+        heavJumps{i} = getRelativeJumps_eq(currStationJumps{:, 2}, t0, ~eqLogical);
+    end
+    % Add ITRF Realization Change Jumps
+    fprintf('[%s]: doITRFjumps set to "%s"\n', coordinateName{i}(1), mat2str(doITRFjump(i)));
+    if doITRFjump(i)
+        % append itrf jumps to heaviside jumps vector
+        heavJumps{i} = [heavJumps{i}; jumps0itrf];
+    end
 end
 
-%% Prepare Trend Estimation
-% preallocate cell arrays
+% preallocate cell arrays for output
 result_parameters = cell(3, 2);
-outlier_logicals = cell(3, 1);
+outlier_logicals  = cell(3, 1);
+outlier_logicals  = cellfun(@(x) zeros(length(t), 1), outlier_logicals, 'UniformOutput', false); % workaround for no outliers
+
 % create datetime array with equal date intervals (1d)
-% % dateIntvl =  data{:, 'date'}; % verify integrity of algorithm COMMENT
-dateIntvl =  min(data{:, 'date'}):days(1):max(data{:, 'date'}); %
+tInterpolV =  data{:, 'date'}; % verify integrity of algorithm COMMENT
+% dateIntvl =  min(data{:, 'date'}):days(1):max(data{:, 'date'}); %
 % n of intervals (ie days)
-dateIntvlN = length(dateIntvl);
-trenddata = zeros(dateIntvlN, 3);
+dateIntvlN = length(tInterpolV);
+% trenddata = zeros(dateIntvlN, 3); % preallocate trend data array
+trenddata = [];
+
+% generate tau vector for transients containing all combinations
+tsFctStr = {'log','exp'};
+tauCell = cell(3,1);
+for i = 1:3 % E-N-U
+    if any(strcmp( transientType{i,1} , tsFctStr )) &&  any(strcmp( transientType{i,2} , tsFctStr ))
+        [tauGrid1, ...
+            TauGrid2] = meshgrid(tauVec1, tauVec2); % create two grids
+        tauGrid       = cat(2, tauGrid1, TauGrid2); % cat along 2nd dimension
+        tauVec = reshape(tauGrid, [], 2);           % reshape to 2 col vector with rows (tau1, tau2)
+        tauCell{i} = num2cell(tauVec,2);
+    elseif any(strcmp( transientType{i,1} , tsFctStr )) && ~any(strcmp( transientType{i,2} , tsFctStr ))
+        transientType{i,2} = ''; % remove string from cell
+        tauVec        = tauVec1';
+        tauCell{i} = num2cell(tauVec,2);
+    elseif ~any(strcmp( transientType{i,1} , tsFctStr )) &&  any(strcmp( transientType{i,2} , tsFctStr ))
+        transientType{i,1} = '';
+        tauVec        = tauVec2';
+        tauCell{i} = num2cell(tauVec,2);
+    else % no match found, no transient to be estimated
+        transientType{i,1} = ''; % remove string from cell
+        transientType{i,2} = ''; % remove string from cell
+        tauCell{i} = {[]};
+    end
+%     tauCell{i} = tauVec;
+end
+
+% other variables - get count of params (poly,osc, jumps, transients) per coordinate
+for i = 1:3 % E-N-U
+    nPolynTerms(i) = polynDeg(i) + 1; % 0, 1, 2, ...
+    nOscParam(i)   = length(oscW{i}) * 2; % cos & sin components (C, S) for every oscillation
+    nJumps(i)      = length(heavJumps{i}); % All Jumps - From DB and ITRF (if set to true)
+    nTransients(i) = length(transients{i}) * (size(tauCell{i}{1},2)); % Only EQ Jumps -> n of transients
+end
+
+% prepare array to store results rms,wrms,est.params FOR EVERY COMBINATION
+% OF TAU (rows) and E,N,U (cols)
+resultCell = cell(3,1);
+for i = 1:3 % E-N-U
+    resultCell{i} = zeros(size(tauCell{i},1), 2+nPolynTerms(i)+nOscParam(i)+nJumps(i)+nTransients(i) );
+end
 
 %% Write Input Parameters to log file
-writeInputLog(fID, stationname, data{:, 'date'}, ...
-    polynDeg, P, HJumps, EQJump, KK, p, outl_factor);
-
-% other variables - get count of unknowns for each type (poly, osc, jumps,
-% transients)
-nPolynTerms = polynDeg + 1; % 0, 1, 2, ... 
-nOscParam = length(W) * 2; % cos & sin components (C, S) for every oscillation
-nJumps = length(HJumps); % All Jumps - From DB and ITRF (if set to true)
-nEQJumps = length(EQJump); % Only EQ Jumps -> n of transients
-
-%% Trend Estimation
-for i = 1:3
-    fprintf('Evaluating "%s" ...\n', coordinateSTR{i});
-    [y, result_parameterC, xEst, outlierLogical] = computeTrendIRLS(...
-        t, ... % t in years where t0 = beginning of TS
-        data{:, i + 2}, ... % vector with TS metric (Coordinate measurement)
-        polynDeg, ...  % polynome degree
-        W, ...  % periods
-        HJumps, ...  % jumps: time in years since t0
-        EQJump, ... % eqs jumps: time in years since t0
-        T, ... %  logar. transient parameter T for earthquakes
-        KK, ... % n of iterations for IRLS
-        p, ... % L_p Norm for IRLS
-        outl_factor); % median(error) + standard deviation * factor -> outlier
-    
-    % store results in master arrays for further evaluation
-    trenddata(:, i) = y;
-    result_parameters{i, 1} = coordinateSTR{i};
-    result_parameters{i, 2} = result_parameterC; % assign parameter cell to super cell
-    outlier_logicals{i} = outlierLogical; % 1: suspected outlier measurements, computed in IRLS function
-    
-    % print output parameters using custom function
-    writeOutputLog(fID, [stationname, '-', coordinateSTR{i}], xEst, ...
-        polynDeg, P, HJumps, EQJump, result_parameterC{1, 2}, result_parameterC{2, 2})
+for i = 1:3 % E-N-U
+    writeInputLog(fID, stationName, coordinateName{i}, data{:, 'date'}, ...
+        polynDeg(i), osc{i}, heavJumps{i}, transients{i}, KK, p, outlFactor);
 end
+
+%% Parameter Estimation
+for j = 1:3 % E-N-U
+    for i = 1:length(tauCell{j})
+        % LSE to get approximate parameters x0
+        fprintf('Evaluating "%s" ...\n', coordinateName{j});
+        [y, result_parameterC, xEst, ~] = computeTrendIRLS(... % trend, rms/wrms, parameters, outlier logical
+            t, ...                  % t in years where t0=beginning of TS
+            data{:, j + 2}, ...     % vector with metric (coordinate)
+            polynDeg(j), ...        % polynome degree
+            oscW{j}, ...            % periods
+            heavJumps{j}, ...       % jumps: time in years since t0
+            transients{j}, ...      % eq transients: time in years since t0
+            tauCell{j}{i}, ...      % transient parameter tau
+            [transientType{j,1};... % type (function) of tau 2(log|exp)
+            transientType{j,2}],... % type (function) of tau 2(log|exp)
+            KK, ...                 % n of iterations for IRLS
+            p, ...                  % L_p Norm for IRLS
+            outlFactor);            % median(error) + standard deviation * factor -> outlier
+        % results: [RMS,WRMS,Params]
+        resultCell{j}(i,:) = [result_parameterC{1,2}, result_parameterC{1,2}, xEst'];
+    end
+end
+
+% get best solution: min RMS (idx)
+[~, EMinIdx]    = min( resultCell{1}(:,1) );
+[~, NMinIdx]    = min( resultCell{2}(:,1) );
+[~, UMinIdx]    = min( resultCell{3}(:,1) );
+if length(tauCell{1})==length(tauCell{2})
+    [~, ENMinIdx]   = min(sum( [resultCell{1}(:,1), resultCell{2}(:,1)],2));
+    if length(tauCell{1})==length(tauCell{2}) &&  ...
+            length(tauCell{1})==length(tauCell{3})
+        [~, TotalMinIdx]= min(sum( [resultCell{1}(:,1), resultCell{2}(:,1), resultCell{3}(:,1)] ,2));
+    end
+end
+BestIdx = [EMinIdx NMinIdx UMinIdx]; % can be adapted
+
+% compute time series based on found solution for ENU
+for i = 1:3 % E-N-U
+    oscCS = resultCell{i}(BestIdx(i), 3+nPolynTerms(i) : 3+nPolynTerms(i)+nOscParam(i)-1);
+    oscCS = [oscCS(1:2:end); oscCS(2:2:end)]; % reorder cosine/sine components
+    trenddata(:, i) = TimeFunction(years(seconds(t)), ...
+        resultCell{i}(BestIdx(i), 3 : 3+nPolynTerms(i)-1 ), ...
+        oscCS, ... % rearranged oscillation amplitudes (cosine, sine)
+        osc{i}, ... % periods
+        years(seconds(heavJumps{i})), ...
+        resultCell{i}(BestIdx(i), 3+nPolynTerms(i)+nOscParam(i) : 3+nPolynTerms(i)+nOscParam(i)+nJumps(i)-1), ...
+        years(seconds(transients{i})), ...
+        resultCell{i}(BestIdx(i), 3+nPolynTerms(i)+nOscParam(i)+nJumps(i) : end), ...
+        tauCell{i}{BestIdx(i)},...
+        [transientType{i,1}; transientType{i,2}]...
+        );
+end
+
+% create map plot for tau
+for i = 1:3 % E-N-U
+    if size(tauCell{i}{1},2) == 1 % 1 tau
+        figure
+        plot(days(years( cell2mat(tauCell{i}) )) , resultCell{i}(:,1) )
+        xlabel('\tau_{log} [days]')
+        ylabel('rms [mm]')
+        title(["\tau parameter space for ", coordinateName{i}])
+    elseif size(tauCell{i}{1},2) == 2 && length(tauVec1)>1 && length(tauVec2)>1  % 2 tau
+        resultGrid = reshape(resultCell{i}(:,1), length(tauVec2), length(tauVec1) );
+        figure
+        colormap(flipud(parula)) % low error = good
+        contourf(days(years(tauVec1)),days(years(tauVec2)),resultGrid);
+        xlabel('\tau_{log1}SHORT [days]')
+        ylabel('\tau_{log2}LONG [days]')
+        title(["\tau parameter space for ", coordinateName{i}])
+        c = colorbar;
+        c.Label.String = 'RMS';
+    end
+end
+
+% save results, write logs
+for i = 1:3 % E-N-U
+    result_parameters{i, 1} = coordinateName{i};
+    result_parameters{i, 2} = ...
+        {'rms', resultCell{i}(BestIdx(i),1); 'wrms', resultCell{i}(BestIdx(i),2)}; % assign parameter cell to super cell
+end
+% needs rework!!
+% % writeOutputLog(fID, [stationname, '-', coordinateSTR{j}], xEst, ...
+% %     polynDeg, P, HJumps, EQJump, results{1, 2}, results{2, 2})
+% % outlier_logicals{j} = outlierLogical; % 1: suspected outlier measurements, computed in IRLS function
+
 fclose(fID); % close log file
 fprintf('Calculation finished.\nPlotting and writing results ...\n')
 
 %% Write Trend Results to file
 % use parameters in file name
-resultSaveFile = fullfile(logFileFolder, [stationname, ...
-    sprintf('_itrf%d_KK%d_p%.1f_outl%d', doITRFjump,KK, p, outl_factor), ...
+resultSaveFile = fullfile(logFileFolder, [stationName, ...
+    sprintf('_itrf%d_KK%d_p%.1f_outl%d', doITRFjump,KK, p, outlFactor), ...
     '.csv']); % output: file name of computed trends (csv)
 
 % use custom fct
-resultM = writeResultMatrix(dateIntvl, trenddata, doITRFjump, KK, p, outl_factor, ...
+resultM = writeResultMatrix(tInterpolV, trenddata, doITRFjump, KK, p, outlFactor, ...
     [result_parameters{1, 2}{1, 2}, result_parameters{2, 2}{1, 2}, result_parameters{3, 2}{1, 2}], ...
     [result_parameters{1, 2}{2, 2}, result_parameters{2, 2}{2, 2}, result_parameters{3, 2}{2, 2}]);
 
 % write matrix to csv file
 %writematrix(resultM, resultSaveFile, 'Delimiter', 'comma') % R2019a
-csvwrite(resultSaveFile, resultM); % R2006
+if doSaveResults; csvwrite(resultSaveFile, resultM); end% R2006
 
 %% Visualize Results
 % set up title
-titleString = cell(3, 1);
-titleStringPattern = 'Station: %s - n of Obs.=%d - ITRF Jumps: %s - RMS = %.2fmm';
-
-for i = 1:3 % for E N U respectively
-    if doITRFjump == true
-        ITRFstring = 'true';
-    else
-        ITRFstring = 'false';
-    end
+titleString = cell(3, 1); % preallocate
+for i = 1:3 % E-N-U
     % set up plot title
-    titleString{i} = sprintf(titleStringPattern, ...
-        stationname, size(data{:, 'date'}, 1), ITRFstring, result_parameters{i,2}{1,2});
+    if isempty(transientType{i,1}) && isempty(transientType{i,2});transientType{i,1}='none';end
+    titleString{i} = sprintf('Station:"%s" Transient:%s jump(itrf):%s  jump(eq):%s  RMS=%.2fmm WRMS=%.2fmm', ...
+        stationName, sprintf('%s %s', transientType{i,1},transientType{i,2}),...
+        mat2str(doITRFjump(i)), ...
+        mat2str(doEQjump(i)), ...
+        result_parameters{i,2}{2,2}, result_parameters{i,2}{2,2}); % rms&wrms
 end
 
+% visualize time series and results
 figTSA = figure;
 VisualizeTS_Trend_Outliers_ITRF_ENU(...
-    data{:, 'date'}, [data{:, 3}, data{:, 4}, data{:, 5}], outlier_logicals, coordinateSTR, ...
-    dateIntvl, trenddata, ...
+    data{:, 'date'}, [data{:, 3}, data{:, 4}, data{:, 5}], outlier_logicals, coordinateName, ...
+    tInterpolV, trenddata, ...
     titleString, ...
     currStationJumps{:, 'Date'}, ...
     [currStationJumps{:, 'Earthquake'}, currStationJumps{:, 'HWSW_Change'}, currStationJumps{:, 'Unknown'}], ...
-    jump_category_names, ...
-    readITRFChanges(itrf_changes_textfile)...
+    jumpCategoryNames, ...
+    readITRFChanges(itrfChangesTextfile)...
     )
-
-% set(gcf, 'InnerPosition', [0 0 604 513]);
+% set(gcf, 'InnerPosition', [0 0 604 513]); % small figure
 set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
 
-%% PRINT PLOT
-plot_title = [stationname, '-trend.png'];
-plot_dir = 'stationTSA_dailyXYZfiles_xyz_plots';
-saveas(figTSA, fullfile(plot_dir, plot_title)); % Save figure as image file
+% visualize residuals
+figRes = figure;
+VisualizeResiduals(...
+    data{:, 'date'}, [...
+    data{:, 3}-trenddata(:,1), ... % E residuals
+    data{:, 4}-trenddata(:,2), ... % N residuals
+    data{:, 5}-trenddata(:,3)], ...% U residuals
+    outlier_logicals, ...
+    cellfun(@(x) ['Residual \Delta',x],coordinateName,'UniformOutput',false), ...
+    titleString, ...
+    currStationJumps{:, 'Date'}, ...
+    [currStationJumps{:, 'Earthquake'}, currStationJumps{:, 'HWSW_Change'}, currStationJumps{:, 'Unknown'}], ...
+    jumpCategoryNames, ...
+    readITRFChanges(itrfChangesTextfile)...
+    )
+% set(gcf, 'InnerPosition', [0 0 604 513]); % small figure
+set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
+
+% PRINT PLOT
+if doSaveResults % Save figure as image file
+    plot_title = [stationName, '-trend.png'];
+    plot_dir = 'stationTSA_dailyXYZfiles_xyz_plots';
+    saveas(figTSA, fullfile(plot_dir, plot_title));
+end
+
+% PRINT PLOT
+if doSaveResults % Save figure as image file
+    plot_title = [stationName, '-residuals.png'];
+    plot_dir = 'stationTSA_dailyXYZfiles_xyz_plots';
+    saveas(figRes, fullfile(plot_dir, plot_title));
+end 
 
 %%
 fprintf('Done!\n')
-
 % close all
