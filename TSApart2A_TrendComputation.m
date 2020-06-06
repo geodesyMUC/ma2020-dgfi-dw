@@ -71,21 +71,21 @@ tauVec1 = years(days(1:15:200));
 tauVec2 = years(days(201:30:730));
 % tauVec2=[]; % only 1 transient
 
-% % specify type of transient: "log","exp","nil"
-% transientType = {...
-%     'log','log'; ...    % coordinate1:E|X
-%     'log','log'; ...    % coordinate2:N|Y
-%     'log','log'};       % coordinate3:U|Z
-
 % specify type of transient: "log","exp","nil"
 transientType = {...
     'log','log'; ...    % coordinate1:E|X
     'log','log'; ...    % coordinate2:N|Y
     'log','log'};       % coordinate3:U|Z
 
+% % specify type of transient: "log","exp","nil"
+% transientType = {...
+%     'exp','nil'; ...    % coordinate1:E|X
+%     'exp','nil'; ...    % coordinate2:N|Y
+%     'exp','nil'};       % coordinate3:U|Z
+
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
 doITRFjump  = [false false false]; % E-N-U
-doEQjump    = [false false false]; % E-N-U
+doEQjump    = [true true true]; % E-N-U
 
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
 KK = 0;             % n of iterations for IRLS
@@ -196,19 +196,23 @@ trenddata = [];
 tsFctStr = {'log','exp'};
 tauCell = cell(3,1);
 for i = 1:3 % E-N-U
-    if      any(strcmp( transientType{i,1} , tsFctStr )) &&  any(strcmp( transientType{i,2} , tsFctStr ))
+    if any(strcmp( transientType{i,1} , tsFctStr )) &&  any(strcmp( transientType{i,2} , tsFctStr ))
         [tauGrid1, ...
             TauGrid2] = meshgrid(tauVec1, tauVec2); % create two grids
         tauGrid       = cat(2, tauGrid1, TauGrid2); % cat along 2nd dimension
         tauVec = reshape(tauGrid, [], 2);           % reshape to 2 col vector with rows (tau1, tau2)
         tauCell{i} = num2cell(tauVec,2);
-    elseif  any(strcmp( transientType{i,1} , tsFctStr )) && ~any(strcmp( transientType{i,2} , tsFctStr ))
+    elseif any(strcmp( transientType{i,1} , tsFctStr )) && ~any(strcmp( transientType{i,2} , tsFctStr ))
+        transientType{i,2} = ''; % remove string from cell
         tauVec        = tauVec1';
         tauCell{i} = num2cell(tauVec,2);
     elseif ~any(strcmp( transientType{i,1} , tsFctStr )) &&  any(strcmp( transientType{i,2} , tsFctStr ))
+        transientType{i,1} = '';
         tauVec        = tauVec2';
         tauCell{i} = num2cell(tauVec,2);
     else % no match found, no transient to be estimated
+        transientType{i,1} = ''; % remove string from cell
+        transientType{i,2} = ''; % remove string from cell
         tauCell{i} = {[]};
     end
 %     tauCell{i} = tauVec;
@@ -241,16 +245,18 @@ for j = 1:3 % E-N-U
         % LSE to get approximate parameters x0
         fprintf('Evaluating "%s" ...\n', coordinateName{j});
         [y, result_parameterC, xEst, ~] = computeTrendIRLS(... % trend, rms/wrms, parameters, outlier logical
-            t, ... % t in years where t0 = beginning of TS
-            data{:, j + 2}, ... % vector with TS metric (Coordinate measurement)
-            polynDeg(j), ...  % polynome degree
-            oscW{j}, ...  % periods
-            heavJumps{j}, ...  % jumps: time in years since t0
-            transients{j}, ... % eqs jumps: time in years since t0
-            tauCell{j}{i}, ... %  logar. transient parameter T for earthquakes
-            KK, ... % n of iterations for IRLS
-            p, ... % L_p Norm for IRLS
-            outlFactor); % median(error) + standard deviation * factor -> outlier
+            t, ...                  % t in years where t0=beginning of TS
+            data{:, j + 2}, ...     % vector with metric (coordinate)
+            polynDeg(j), ...        % polynome degree
+            oscW{j}, ...            % periods
+            heavJumps{j}, ...       % jumps: time in years since t0
+            transients{j}, ...      % eq transients: time in years since t0
+            tauCell{j}{i}, ...      % transient parameter tau
+            [transientType{j,1};... % type (function) of tau 2(log|exp)
+            transientType{j,2}],... % type (function) of tau 2(log|exp)
+            KK, ...                 % n of iterations for IRLS
+            p, ...                  % L_p Norm for IRLS
+            outlFactor);            % median(error) + standard deviation * factor -> outlier
         % results: [RMS,WRMS,Params]
         resultCell{j}(i,:) = [result_parameterC{1,2}, result_parameterC{1,2}, xEst'];
     end
@@ -278,7 +284,8 @@ for i = 1:3 % E-N-U
         resultCell{i}(BestIdx(i), 3+nPolynTerms(i)+nOscParam(i) : 3+nPolynTerms(i)+nOscParam(i)+nJumps(i)-1), ...
         years(seconds(transients{i})), ...
         resultCell{i}(BestIdx(i), 3+nPolynTerms(i)+nOscParam(i)+nJumps(i) : end), ...
-        tauCell{i}{BestIdx(i)}...
+        tauCell{i}{BestIdx(i)},...
+        [transientType{i,1}; transientType{i,2}]...
         );
 end
 
@@ -337,8 +344,9 @@ if doSaveResults; csvwrite(resultSaveFile, resultM); end% R2006
 titleString = cell(3, 1); % preallocate
 for i = 1:3 % E-N-U
     % set up plot title
-    titleString{i} = sprintf('Station:"%s"  n=%d  ITRF Jumps:%s  EQ Jumps:%s  RMS=%.2fmm WRMS=%.2fmm', ...
-        stationName, size(data{:, 'date'}, 1), mat2str(doITRFjump(i)), ...
+    titleString{i} = sprintf('Station:"%s" Transient:%s jump(itrf):%s  jump(eq):%s  RMS=%.2fmm WRMS=%.2fmm', ...
+        stationName, sprintf('%s %s', transientType{i,1},transientType{i,2}),...
+        mat2str(doITRFjump(i)), ...
         mat2str(doEQjump(i)), ...
         result_parameters{i,2}{2,2}, result_parameters{i,2}{2,2}); % rms&wrms
 end

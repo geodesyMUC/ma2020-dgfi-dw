@@ -1,4 +1,4 @@
-function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, polynDeg, W, j_t, ts_t, tau, KK, p, outl_factor)
+function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, polynDeg, W, j_t, ts_t, tau, transType, KK, p, outl_factor)
 % IRLSE - Iterative Reweighted (Linear) Least Squares
 % INPUT
 %   x: vector containing time stamps in [SECONDS] relative to t0
@@ -14,19 +14,19 @@ function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, polynDeg, W
 %   If p=2, no reweighting will be applied, independent of the number of iterations KK
 %   outl_factor: median(error)|mean(error) + standard deviation * factor -> outlier
 
-if nargin <= 7
+if nargin <= 8
     % Additional Parameters (default values)
     KK = 0; % n of iterations for IRLS
     p = 2.0; % L_p Norm for IRLS
-    outl_factor = 4; % median(error) + standard deviation * factor -> outlier
+    outl_factor = 5; % median(error) + standard deviation * factor -> outlier
     fprintf('No IRLS parameters defined. Calculating L2 norm LSE.\n')
 end
 
 fprintf('n of iterations for IRLS = %d,\np of L_p Norm for IRLS = %.2f,\nOutlier Factor = %d (mean of error + standard deviation * factor < outlier)\n', ...
     KK, p, outl_factor);
 
-if nargin == 6 || nargin == 9
-    tau = 1; % assign default value 1y for logar. transient parameter T
+if length(tau) ~= size(transType,1)
+    error('length of tau vector for transients does not match length of type of tau vector')
 end
 
 % convert datetimes from [seconds] to [years]
@@ -79,14 +79,20 @@ cnt=1;
 for i = 1:length(ts_t)
     dt = x - ts_t(i);
     dt(dt < 0) = 0; % Every observation BEFORE the event
-    if size(tau,2)>0
-        % Transient 1
-        A(:, N(4)+cnt  ) = log( 1 + dt./tau(1) ); % logarithmic transient 1
-        %     A(:, N(4)+cnt )       = exp(-dt./T(1)); % exponential transient 1
-        if size(tau,2)>1
-            % Transient 2
-            A(:, N(4)+cnt+1 ) = log( 1 + dt./tau(2) ); % logarithmic transient 2
-            %         A(:, N(4)+cnt+1 ) = exp(-dt./T(2)); % exponential transient 2
+    if size(tau,2) > 0
+        % Choose function for Transient 1
+        if strcmp(transType(1,:),'log')
+            A(:, N(4)+cnt  ) = log( 1 + dt./tau(1) ); % logarithmic transient 1
+        elseif strcmp(transType(1,:),'exp')
+            A(:, N(4)+cnt )       = exp(-dt./tau(1)); % exponential transient 1
+        end
+        if size(tau,2) > 1
+            % Choose function for Transient 2
+            if strcmp(transType(2,:),'log')
+                A(:, N(4)+cnt+1 ) = log( 1 + dt./tau(2) ); % logarithmic transient 2
+            elseif strcmp(transType(2,:),'exp')
+                A(:, N(4)+cnt+1 ) = exp(-dt./tau(2)); % exponential transient 2
+            end
         end
     end
     cnt=cnt+length(tau);
@@ -190,7 +196,7 @@ xSim = x'; % original values, no interpolation
 % call function
 % creates y values (e.g. up values) for "simulated" time series
 y = TimeFunction(xSim, polynParam, periodicParam, W, j_t, jumpParam, ...
-    ts_t, EQtransient, tau);
+    ts_t, EQtransient, tau, transType);
 % y = A * xEst;
 end
 
