@@ -166,7 +166,7 @@ end
 % ylabel('p norm [mm]')
 % xlabel('# Iteration ->')
 
-% get rms and wrms into result cell for output
+% wrap rms and wrms into result cell for output
 results{1, 1} = 'rms';
 results{1, 2} = rms;
 results{2, 1} = 'wrms';

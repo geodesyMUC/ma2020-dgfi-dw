@@ -49,18 +49,18 @@ doSaveResults = true; % save pngs and result files
 % stationName = 'PBJP';
 
 % stationName = '21701S007A03'; % KSMV %[ok]
-% stationName = '21702M002A07'; % MIZU %[ok]
+stationName = '21702M002A07'; % MIZU %[ok]
 % stationName = '21729S007A04'; % USUDA %[ok]
 % stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
-stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
+% stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
 % stationName = '41719M004A02'; % Concepcion %[ok]
 
 %%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-polynDeg = [1, 1, -1];% Polynomial Trend,Integer Degree, Range [-1..3]
+polynDeg = [-1, -1, -1];% Polynomial Trend,Integer Degree, Range [-1..3]
 % periods / oscillations in YEARS (=365.25 days) in vector form
-osc = {[1], [1], []};     % common values: 0.5y, 1y
+osc = {[], [], []};     % common values: 0.5y, 1y
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
 doITRFjump  = [false false false]; % E-N-U
 doEQjump    = [true true true]; % E-N-U
@@ -73,11 +73,10 @@ transientType = {...
 % Parameter tau in [years] for computation of logarithmic transient for
 % earthquake events (jumps):
 % vector mapping different T (tau) relaxation coefficients
-tauVec1 = years(days(1:15:180));
+tauVec1 = years(days(1:15:200));
 tauVec2 = years(days(231:30:730));
-% tauVec1 = years(days(100));
-% tauVec2 = years(days(365));
-% tauVec2=[]; % only 1 transient
+% tauVec1 = years(days(1:5:365)); % full range tau
+
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
 KK = 0;             % n of iterations for IRLS
 p = 2.0;            % L_p Norm for IRLS
@@ -90,16 +89,12 @@ jumpCategoryNames = {'Earthquake', 'SW/HW-Change', 'Unknown'}; % corresponds to 
 
 %%% Output %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 logFileFolder = 'TSA_TrendComputationResults'; % output: log file directory
-logFile = [stationName, '_TrendComputation_log.txt']; % output: log file name
 
 %% Log File
 if ~exist(logFileFolder, 'dir')
     mkdir(logFileFolder)
     fprintf('Result file storage directory "%s" created.\n', logFileFolder);
 end
-
-% Open Log File and get identifier
-fID = fopen(fullfile(logFileFolder, logFile), 'wt');
 
 %% Load Station Data
 % look in matched files
@@ -186,6 +181,7 @@ trenddata = [];
 % generate tau vector for transients containing all combinations
 tsFctStr = {'log','exp'};
 tauCell = cell(3,1);
+tauTypes = cell(3,1);
 for i = 1:3 % E-N-U
     if any(strcmp( transientType{i,1} , tsFctStr )) &&  any(strcmp( transientType{i,2} , tsFctStr ))
         [tauGrid1, ...
@@ -193,17 +189,17 @@ for i = 1:3 % E-N-U
         tauGrid       = cat(2, tauGrid1, TauGrid2); % cat along 2nd dimension
         tauVec = reshape(tauGrid, [], 2);           % reshape to 2 col vector with rows (tau1, tau2)
         tauCell{i} = num2cell(tauVec,2);
+        tauTypes{i} = [ transientType{i,1};transientType{i,2} ];
     elseif any(strcmp( transientType{i,1} , tsFctStr )) && ~any(strcmp( transientType{i,2} , tsFctStr ))
-        transientType{i,2} = ''; % remove string from cell
+        tauTypes{i} = [ transientType{i,1} ];
         tauVec        = tauVec1';
         tauCell{i} = num2cell(tauVec,2);
     elseif ~any(strcmp( transientType{i,1} , tsFctStr )) &&  any(strcmp( transientType{i,2} , tsFctStr ))
-        transientType{i,1} = '';
+        tauTypes{i} = [ transientType{i,2} ];
         tauVec        = tauVec2';
         tauCell{i} = num2cell(tauVec,2);
     else % no match found, no transient to be estimated
-        transientType{i,1} = ''; % remove string from cell
-        transientType{i,2} = ''; % remove string from cell
+        tauTypes{i} = '';
         tauCell{i} = {[]};
     end
 %     tauCell{i} = tauVec;
@@ -225,10 +221,12 @@ for i = 1:3 % E-N-U
 end
 
 %% Write Input Parameters to log file
-for i = 1:3 % E-N-U
-    writeInputLog(fID, stationName, coordinateName{i}, data{:, 'date'}, ...
-        polynDeg(i), osc{i}, heavJumps{i}, transients{i}, KK, p, outlFactor);
-end
+% for i = 1:3 % E-N-U
+%     writeInputLog(fID, stationName, coordinateName{i}, data{:, 'date'}, ...
+%         polynDeg(i), osc{i}, heavJumps{i}, ...
+%         transients{i}, cell2mat(tauCell{i}), tauTypes{i}, ...
+%         KK, p, outlFactor);
+% end
 
 %% Parameter Estimation
 for j = 1:3 % E-N-U
@@ -243,8 +241,7 @@ for j = 1:3 % E-N-U
             heavJumps{j}, ...       % jumps: time in years since t0
             transients{j}, ...      % eq transients: time in years since t0
             tauCell{j}{i}, ...      % transient parameter tau
-            [transientType{j,1};... % type (function) of tau 2(log|exp)
-            transientType{j,2}],... % type (function) of tau 2(log|exp)
+            tauTypes{j},...         % type (function) of tau 2(log|exp)
             KK, ...                 % n of iterations for IRLS
             p, ...                  % L_p Norm for IRLS
             outlFactor);            % median(error) + standard deviation * factor -> outlier
@@ -279,7 +276,7 @@ for i = 1:3 % E-N-U
         years(seconds(transients{i})), ...
         resultCell{i}(BestIdx(i), 3+nPolynTerms(i)+nOscParam(i)+nJumps(i) : end), ...
         tauCell{i}{BestIdx(i)},...
-        [transientType{i,1}; transientType{i,2}]...
+        tauTypes{i}...
         );
 end
 
@@ -310,15 +307,29 @@ for i = 1:3 % E-N-U
     result_parameters{i, 2} = ...
         {'rms', resultCell{i}(BestIdx(i),1); 'wrms', resultCell{i}(BestIdx(i),2)}; % assign parameter cell to super cell
 end
-% needs rework!!
-% % writeOutputLog(fID, [stationname, '-', coordinateSTR{j}], xEst, ...
-% %     polynDeg, P, HJumps, EQJump, results{1, 2}, results{2, 2})
-% % outlier_logicals{j} = outlierLogical; % 1: suspected outlier measurements, computed in IRLS function
+
+%% Write Trend Results to files
+% Open Log File and get identifier
+logFile = [stationName,'.', datestr(datetime('now'),'yyyy-mm-dd_HH-MM-SS'),'.log']; % output: log file name
+fID = fopen(fullfile(logFileFolder, logFile), 'wt');
+for i = 1:3 % E-N-U
+    writeInputLog(fID, stationName, coordinateName{i}, data{:, 'date'}, ...
+        polynDeg(i), osc{i}, heavJumps{i}, ...
+        transients{i}, cell2mat(tauCell{i}), tauTypes{i}, ...
+        KK, p, outlFactor);
+    writeOutputLog(fID, dataStation, coordinateName{i}, ...
+        resultCell{i}(BestIdx(i), 3 : 3+nPolynTerms(i)-1 ), ...
+        oscCS, ...
+        resultCell{i}(BestIdx(i), 3+nPolynTerms(i)+nOscParam(i) : 3+nPolynTerms(i)+nOscParam(i)+nJumps(i)-1), ...
+        resultCell{i}(BestIdx(i), 3+nPolynTerms(i)+nOscParam(i)+nJumps(i) : end), ...
+        tauCell{i}{BestIdx(i)}, ...
+        resultCell{i}(BestIdx(i),1), resultCell{i}(BestIdx(i),2)...
+        )
+end
 
 fclose(fID); % close log file
 fprintf('Calculation finished.\nPlotting and writing results ...\n')
 
-%% Write Trend Results to file
 % use parameters in file name
 resultSaveFile = fullfile(logFileFolder, [stationName, ...
     sprintf('_itrf%d_KK%d_p%.1f_outl%d', doITRFjump,KK, p, outlFactor), ...
@@ -338,9 +349,9 @@ if doSaveResults; csvwrite(resultSaveFile, resultM); end% R2006
 titleString = cell(3, 1); % preallocate
 for i = 1:3 % E-N-U
     % set up plot title
-    if isempty(transientType{i,1}) && isempty(transientType{i,2});transientType{i,1}='none';end
+    if isempty(tauTypes{i});tsStr='none'; else; tsStr=sprintf('%s %s', transientType{i,1},transientType{i,2}); end
     titleString{i} = sprintf('Station:"%s" Transient:%s jump(itrf):%s  jump(eq):%s  RMS=%.2fmm WRMS=%.2fmm', ...
-        stationName, sprintf('%s %s', transientType{i,1},transientType{i,2}),...
+        stationName, tsStr,...
         mat2str(doITRFjump(i)), ...
         mat2str(doEQjump(i)), ...
         result_parameters{i,2}{2,2}, result_parameters{i,2}{2,2}); % rms&wrms
@@ -378,14 +389,14 @@ VisualizeResiduals(...
 % set(gcf, 'InnerPosition', [0 0 604 513]); % small figure
 set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
 
-% PRINT PLOT
+% PRINT PLOT TREND
 if doSaveResults % Save figure as image file
     plot_title = [stationName, '-trend.png'];
     plot_dir = 'stationTSA_dailyXYZfiles_xyz_plots';
     saveas(figTSA, fullfile(plot_dir, plot_title));
 end
 
-% PRINT PLOT
+% PRINT PLOT RESIDUALS
 if doSaveResults % Save figure as image file
     plot_title = [stationName, '-residuals.png'];
     plot_dir = 'stationTSA_dailyXYZfiles_xyz_plots';
