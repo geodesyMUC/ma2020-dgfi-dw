@@ -33,7 +33,7 @@ addpath('myfunctions')
 inputFolder = 'station_data_dailyXYZfiles'; % Where Station Data (TSA_ReadAndTransform) is stored as ".mat"
 jumpCSVLocation = 'src/jumps_dailyXYZfiles.csv'; % Location of Jump Table/Jump Database
 itrfChangesTextfile = 'src/itrf_changes.txt';
-doSaveResults = true; % save pngs and result files
+doSaveResults = false; % save pngs and result files
 %%% Name of station to be analysed %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SELECTION FOR ANALYSIS
 
@@ -73,8 +73,8 @@ transientType = {...
 % Parameter tau in [years] for computation of logarithmic transient for
 % earthquake events (jumps):
 % vector mapping different T (tau) relaxation coefficients
-tauVec1 = years(days(1:15:200));
-tauVec2 = years(days(231:30:730));
+tauVec1 = years(days(1:10:200));
+tauVec2 = years(days(250:30:730));
 % tauVec1 = years(days(1:5:365)); % full range tau
 
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
