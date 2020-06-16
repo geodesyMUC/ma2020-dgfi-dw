@@ -3,12 +3,16 @@ close all;
 % down hill simplex algorithm
 
 load('temp/output.mat')
+% resultGrid = -rot90(rot90(resultGrid));
 tau1 = years(days(1:10:200));
 tau2 = years(days(250:30:730));
 lLim = [min(tau1), min(tau2)];
 uLim = [max(tau1), max(tau2)];
 tol = 0.0001;
 x0 = [ min(tau1) + 0.0*(max(tau1)-min(tau1)) , min(tau2) + 0.0*(max(tau2)-min(tau2)) ];
+steps = [max(tau1)-min(tau1), max(tau2)-min(tau2)];
+restartScale = 0.01; % 
+doPlot = false;
 
 figure
 pcolor(tau1,tau2,-resultGrid);
@@ -20,10 +24,12 @@ ylim([min(tau2) , max(tau2)])
 colorbar
 hold on
 
-nIter = 1000;
+nIter = 10;
 res = zeros(nIter,1);
 for i=1:nIter
-    res(i) = neldermead(x0,tau1,tau2,resultGrid,lLim,uLim,tol,false);
+    [~,fxMin,nFnCalls,nRestarts,~] = ...
+        neldermead(@myInterp2, x0, steps, lLim, uLim, tol, restartScale, doPlot);
+    res(i) = fxMin;
 end
 hold off
 
@@ -49,139 +55,188 @@ hold on
     2, ...
     5000);
 
-function out = neldermead(xInit,v1,v2,z,low,upp,tol,doPlot)
-N = 2;
-chi = 2;        % expansion
-gamma = 0.5;    % contraction
-sigma = 0.5;    % shrinkage/compression
-rho = 1;        % reflection
+function [xOpt, fxOpt, nF, restarts, err] = neldermead(fn, xInit, L, low, upp, tol, restartScale, doPlot)
+err = '';
 
-p = 1/( N*sqrt(2) )*( N-1+sqrt( N+1 ) );
-q = 1/( N*sqrt(2) )*( sqrt( N+1 )-1 );
-L = [max(v1)-min(v1), max(v2)-min(v2)];
+n = length(xInit);  % dimension of problem
+chi = 2;            % expansion
+gamma = 0.5;        % contraction
+sigma = 0.5;        % shrinkage/compression
+rho = 1;            % reflection
 
-nF = 0;
+epsi = 0.001;       % default value for factorial test
+% restartScale = 0.1; % default value for scale of restart simplex
+nF = 0;             % number of fct calls
+
+stepScale = 1;
+p = 1/( n*sqrt(2) )*( n-1+sqrt( n+1 ) );    % initial simplex parameter 1
+q = 1/( n*sqrt(2) )*( sqrt( n+1 )-1 );      % initial simplex parameter 2
 
 if doPlot; plot(xInit(1),xInit(2),'kx'); end
 
-x_ = zeros(3,2);
-for i = 2:3 % vertices
-    for j = 1:2 % dimensions
-        if j == i-1
-            x_(i,j) = xInit(j) + L(j)*p;
-        elseif j ~= i-1
-            x_(i,j) = xInit(j) + L(j)*q;
+maxRestarts = 5;
+restarts = 0;
+% Restart Loop
+while restarts <= maxRestarts
+    % Set up initial Simplex (axis by axis approach)
+    x_ = [xInit; zeros(n+1-1, n)];
+    for i = 2:n+1 % vertices
+        for j = 1:n % dimensions
+            if j == i-1
+                x_(i,j) = xInit(j) + stepScale*L(j)*p;
+            elseif j ~= i-1
+                x_(i,j) = xInit(j) + stepScale*L(j)*q;
+            end
+            %         % random scale factor
+            %         x_(i,j) = low(j) + rand(1,1)*(upp(j)-low(j));
         end
-%         % random scale factor
-%         x_(i,j) = low(j) + rand(1,1)*(upp(j)-low(j));
     end
-end
-x_(1,:)=[];
-X = [xInit; x_];
-
-if doPlot
-    pX = plotSimplex(X);
-    pause(1)
-    delete(pX)
-end
-
-% main iteration
-s = Inf;
-tries = 100;
-
-while s > tol && tries >= 0
-    fprintf('curr stddev: %.5f\n', s)
-    if doPlot; pS = plotSimplex(X); end
+    X = x_;
     
-    fX = interp2(v1,v2,z,X(:,1),X(:,2));
-    nF = nF+1;
-    [~,order] = sort(fX); % sort f(x) ascending
-    X = X(order,:);
+    if doPlot; pX = plotSimplex(X); pause(1); delete(pX); end
     
-    % compute centroid of all vertices except x(end)
-    m = sum( X(1:end-1,:) ,1) .* 1/N;
-    m = shiftInBox(m,low,upp);
-    if doPlot; pM = plot(m(1),m(2),'go'); end
-    
-    % reflect
-    r = ( 1+rho ).*m - rho.*X(end,:);
-    r = projectOnBounds(X(end,:), r, m, rho, low, upp);% boundary check
-    fr = interp2(v1,v2,z,r(1),r(2));
-    nF = nF+1;
-    if doPlot; pR = plot(r(1),r(2),'mo'); end
-    
-    
-    if fr < fX(1)
-        % expand
-        e = ( 1 + rho*chi ).*m - rho*chi.*X(end,:);
-        e = projectOnBounds(X(end,:), e, m, rho*chi, low, upp); % boundary check
-        fe = interp2(v1,v2,z,e(1),e(2));
+    % DHS Iteration Loop
+    s = Inf;
+    maxTries = 100;
+    tries = maxTries;
+    while s > tol && tries >= 0
+        % fprintf('curr stddev: %.5f\n', s)
+        if doPlot; pS = plotSimplex(X); end
+        
+        fX = fn( X );
         nF = nF+1;
-        if doPlot; pE = plot(e(1),e(2),'cx'); end
+        [~,order] = sort(fX); % sort f(x) ascending
+        X = X(order,:);       % adopt order
         
+        % compute centroid of all vertices except x(end)
+        m = sum( X(1:end-1,:) ,1) .* 1/n;
+        m = shiftInBox(m,low,upp); % boundary check
+        if doPlot; pM = plot(m(1),m(2),'go'); end
         
-        if fe < fr
-            % accept e
-            X(end,:) = e;
-            fprintf('#%d:EXPANSION ACCEPTED\n', 101-tries);
-        else
+        % reflect
+        r = ( 1+rho ).*m - rho.*X(end,:);
+        r = projectOnBounds(X(end,:), r, m, rho, low, upp); % boundary check
+        fr = fn( r );
+        nF = nF+1;
+        if doPlot; pR = plot(r(1),r(2),'mo'); end
+        
+        if fr < fX(1)
+            % expand
+            e = ( 1 + rho*chi ).*m - rho*chi.*X(end,:);
+            e = projectOnBounds(X(end,:), e, m, rho*chi, low, upp); % boundary check
+            fe = fn( e );
+            nF = nF+1;
+            if doPlot; pE = plot(e(1),e(2),'cx'); end
+            
+            if fe < fr
+                % accept e
+                X(end,:) = e;
+                % fprintf('#%d:EXPANSION ACCEPTED\n', 101-tries);
+            else
+                % accept r
+                X(end,:) = r;
+                % fprintf('#%d:REFLECTION ACCEPTED\n', 101-tries);
+            end
+            
+        elseif fX(1) <= fr && fr < fX(end-1)
             % accept r
             X(end,:) = r;
-            fprintf('#%d:REFLECTION ACCEPTED\n', 101-tries);
-        end
-        
-    elseif fX(1) <= fr && fr < fX(end-1)
-        % accept r
-        X(end,:) = r;
-        fprintf('#%d:REFLECTION ACCEPTED\n', 101-tries);
-        
-    elseif fX(end-1) <= fr && fr < fX(end)
-        % outside contraction
-        c = ( 1+ gamma*rho ).*m - gamma*rho*X(end-1,:);
-        fc = interp2(v1,v2,z,c(1),c(2));
-        nF = nF+1;
-        if doPlot; pC = plot(c(1),c(2),'yx'); end
-        
-        if fc < fr
-            % accept c
-            X(end,:) = c;
-            fprintf('#%d:OUTSIDE CONTRACTION ACCEPTED\n', 101-tries);
+            % fprintf('#%d:REFLECTION ACCEPTED\n', 101-tries);
+            
+        elseif fX(end-1) <= fr && fr < fX(end)
+            % outside contraction
+            c = ( 1+ gamma*rho ).*m - gamma*rho*X(end-1,:);
+            fc = fn( c );
+            nF = nF+1;
+            if doPlot; pC = plot(c(1),c(2),'yx'); end
+            
+            if fc < fr
+                % accept c
+                X(end,:) = c;
+                % fprintf('#%d:OUTSIDE CONTRACTION ACCEPTED\n', 101-tries);
+            else
+                % shrink/compression
+                X(2:end,:) = X(1,:) + sigma.*( X(2:end,:)-X(1,:) );
+                % fprintf('#%d:SHRINK', 101-tries);
+            end
         else
-            % shrink/compression
-            X(2:end,:) = X(1,:) + sigma.*( X(2:end,:)-X(1,:) );
-            fprintf('#%d:SHRINK', 101-tries);
+            % inside contraction
+            c = ( 1-gamma ).*m + gamma.*X(end,:);
+            fc = fn( c );
+            nF = nF+1;
+            if doPlot; pC = plot(c(1),c(2),'yx'); end
+            if fc < fX(end)
+                % if better than x(end), accept. if not, shrink
+                X(end,:) = c;
+                % fprintf('#%d:INSIDE CONTRACTION ACCEPTED\n', 101-tries);
+            else
+                % shrink/compression
+                X(2:end,:) = X(1,:) + sigma.*( X(2:end,:)-X(1,:) );
+                % fprintf('#%d:SHRINK\n', 101-tries);
+            end
         end
+        % calculate standard deviation of function values
+        s = std(fX);
+        % delete from plot
+        if doPlot
+            pause(0.5)
+            delete(pS)
+            delete(pM)
+            if exist('pC','var');delete(pC);end
+            if exist('pE','var');delete(pE);end
+            if exist('pR','var');delete(pR);end
+        end
+        tries = tries-1;
+    end
+       
+    % get minima for fx and x
+    [fxOpt, fxOptIdx] = min(fX);
+    xOpt = X(fxOptIdx,:);
+    fprintf('result fx = %.4f\n', fxOpt);
+    
+    % RESTART if local minimum
+    doRestart = false;
+    
+    for i = 1:n
+        xTest = xOpt;
+        delta = epsi * L(i); % step
+        
+        % Test 1 for local minimum
+        xTest(i) = xTest(i) + delta;
+        fxTest = fn(xTest);
+        nF = nF+1;
+        if fxTest < fxOpt
+            doRestart = true;
+            break
+        end
+        
+        % Test 2 for local minimum
+        xTest(i) = xTest(i) - delta - delta;
+        fxTest = fn(xTest);
+        nF = nF+1;
+        if fxTest < fxOpt
+            doRestart = true;
+            break
+        end
+    end
+    
+    if doRestart
+        % assume local minimum, restart
+        % adapt L, xInit
+        xInit = xTest;
+        stepScale = restartScale; % scale next initial simplex
+        fprintf('RESTART\n');
+        restarts = restarts + 1;
     else
-        % inside contraction
-        c = ( 1-gamma ).*m + gamma.*X(end,:);
-        fc = interp2(v1,v2,z,c(1),c(2));
-        nF = nF+1;
-        if doPlot; pC = plot(c(1),c(2),'yx'); end
-        if fc < fX(end)
-            % if better than x(end), accept. if not, shrink
-            X(end,:) = c;
-            fprintf('#%d:INSIDE CONTRACTION ACCEPTED\n', 101-tries);
-        else
-            % shrink/compression
-            X(2:end,:) = X(1,:) + sigma.*( X(2:end,:)-X(1,:) );
-            fprintf('#%d:SHRINK\n', 101-tries);
-        end
+        % assume global minimum, terminate
+        break
     end
-    % calculate standard deviation of function values
-    s = std(fX);
-    % delete from plot
-    if doPlot 
-        pause(0.5)
-        delete(pS)
-        delete(pM)
-        if exist('pC','var');delete(pC);end
-        if exist('pE','var');delete(pE);end
-        if exist('pR','var');delete(pR);end
-    end
-    tries = tries-1;
 end
-out = min(fX);
-fprintf('result = %.4f\n', out);
+
+if restarts > maxRestarts
+    err = sprintf('maximum number of restarts exceeded (%d). computation aborted, last best values returned', maxRestarts);
+end
+
 end
 
 function plotObj = plotSimplex(X)
