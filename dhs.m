@@ -6,12 +6,16 @@ load('temp/output.mat')
 % resultGrid = -rot90(rot90(resultGrid));
 tau1 = years(days(1:10:200));
 tau2 = years(days(250:30:730));
-lLim = [min(tau1), min(tau2)];
-uLim = [max(tau1), max(tau2)];
+% lLim = [min(tau1), min(tau2)];
+% uLim = [max(tau1), max(tau2)];
+% x0 = [ min(tau1) + 0.0*(max(tau1)-min(tau1)) , min(tau2) + 0.0*(max(tau2)-min(tau2)) ];
+% steps = [max(tau1)-min(tau1), max(tau2)-min(tau2)];
+lLim = [min(tau1)];
+uLim = [max(tau1)];
+x0 = [ min(tau1) + 0.0*(max(tau1)-min(tau1)) ];
+steps = [max(tau1)-min(tau1)];
+restartScale = 0.001; % 
 tol = 0.0001;
-x0 = [ min(tau1) + 0.0*(max(tau1)-min(tau1)) , min(tau2) + 0.0*(max(tau2)-min(tau2)) ];
-steps = [max(tau1)-min(tau1), max(tau2)-min(tau2)];
-restartScale = 0.01; % 
 doPlot = false;
 
 figure
@@ -28,7 +32,7 @@ nIter = 10;
 res = zeros(nIter,1);
 for i=1:nIter
     [~,fxMin,nFnCalls,nRestarts,~] = ...
-        neldermead(@myInterp2, x0, steps, lLim, uLim, tol, restartScale, doPlot);
+        neldermead(@myInterp1, x0, steps, lLim, uLim, tol, restartScale, doPlot);
     res(i) = fxMin;
 end
 hold off
@@ -222,7 +226,7 @@ while restarts <= maxRestarts
     
     if doRestart
         % assume local minimum, restart
-        % adapt L, xInit
+        % adapt stepScale, xInit
         xInit = xTest;
         stepScale = restartScale; % scale next initial simplex
         fprintf('RESTART\n');
@@ -234,7 +238,7 @@ while restarts <= maxRestarts
 end
 
 if restarts > maxRestarts
-    err = sprintf('maximum number of restarts exceeded (%d). computation aborted, last best values returned', maxRestarts);
+    err = sprintf('maximum number of restarts exceeded (%d). last best values returned', maxRestarts);
 end
 
 end
