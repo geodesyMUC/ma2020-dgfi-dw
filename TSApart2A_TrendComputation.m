@@ -245,6 +245,7 @@ for j = 1:3 % E-N-U
             KK, ...                 % n of iterations for IRLS
             p, ...                  % L_p Norm for IRLS
             outlFactor);            % median(error) + standard deviation * factor -> outlier
+        
         % results: [RMS,WRMS,Params]
         resultCell{j}(i,:) = [result_parameterC{1,2}, result_parameterC{1,2}, xEst'];
     end

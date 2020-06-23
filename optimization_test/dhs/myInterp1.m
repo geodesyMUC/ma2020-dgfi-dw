@@ -1,5 +1,5 @@
 function out = myInterp1(x)
-load('temp/output.mat');
+load('src/output.mat');
 tau1 = years(days(1:10:200));
 tau2 = 15;
 resultRow = resultGrid(tau2,:);

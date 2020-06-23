@@ -1,65 +1,4 @@
-clear variables;
-close all;
-% down hill simplex algorithm
-
-load('temp/output.mat')
-% resultGrid = -rot90(rot90(resultGrid));
-tau1 = years(days(1:10:200));
-tau2 = years(days(250:30:730));
-% lLim = [min(tau1), min(tau2)];
-% uLim = [max(tau1), max(tau2)];
-% x0 = [ min(tau1) + 0.0*(max(tau1)-min(tau1)) , min(tau2) + 0.0*(max(tau2)-min(tau2)) ];
-% steps = [max(tau1)-min(tau1), max(tau2)-min(tau2)];
-lLim = [min(tau1)];
-uLim = [max(tau1)];
-x0 = [ min(tau1) + 0.0*(max(tau1)-min(tau1)) ];
-steps = [max(tau1)-min(tau1)];
-restartScale = 0.001; % 
-tol = 0.0001;
-doPlot = false;
-
-figure
-pcolor(tau1,tau2,-resultGrid);
-hold on
-shading interp;
-contour(tau1,tau2,-resultGrid,'LineColor','k');
-xlim([min(tau1) , max(tau1)])
-ylim([min(tau2) , max(tau2)])
-colorbar
-hold on
-
-nIter = 10;
-res = zeros(nIter,1);
-for i=1:nIter
-    [~,fxMin,nFnCalls,nRestarts,~] = ...
-        neldermead(@myInterp1, x0, steps, lLim, uLim, tol, restartScale, doPlot);
-    res(i) = fxMin;
-end
-hold off
-
-figure
-histogram(res)
-
-figure
-pcolor(tau1,tau2,-resultGrid);
-hold on
-shading interp;
-contour(tau1,tau2,-resultGrid,'LineColor','k');
-xlim([min(tau1) , max(tau1)])
-ylim([min(tau2) , max(tau2)])
-colorbar
-hold on
-% ONeill
-[xMin,fxMin,nFcall,nRest,err] = nelmin(...
-    @myInterp2,...
-    2, ...
-    x0, ...
-    tol, ...
-    [max(tau1)-min(tau1), max(tau2)-min(tau2)], ...
-    2, ...
-    5000);
-
-function [xOpt, fxOpt, nF, restarts, err] = neldermead(fn, xInit, L, low, upp, tol, restartScale, doPlot)
+function [xOpt, fxOpt, nF, restarts, err] = dhscopt(fn, xInit, L, low, upp, tol, restartScale)
 err = '';
 
 n = length(xInit);  % dimension of problem
@@ -75,8 +14,6 @@ nF = 0;             % number of fct calls
 stepScale = 1;
 p = 1/( n*sqrt(2) )*( n-1+sqrt( n+1 ) );    % initial simplex parameter 1
 q = 1/( n*sqrt(2) )*( sqrt( n+1 )-1 );      % initial simplex parameter 2
-
-if doPlot; plot(xInit(1),xInit(2),'kx'); end
 
 maxRestarts = 5;
 restarts = 0;
@@ -96,17 +33,12 @@ while restarts <= maxRestarts
         end
     end
     X = x_;
-    
-    if doPlot; pX = plotSimplex(X); pause(1); delete(pX); end
-    
+
     % DHS Iteration Loop
     s = Inf;
     maxTries = 100;
     tries = maxTries;
-    while s > tol && tries >= 0
-        % fprintf('curr stddev: %.5f\n', s)
-        if doPlot; pS = plotSimplex(X); end
-        
+    while s > tol && tries >= 0     
         fX = fn( X );
         nF = nF+1;
         [~,order] = sort(fX); % sort f(x) ascending
@@ -115,14 +47,12 @@ while restarts <= maxRestarts
         % compute centroid of all vertices except x(end)
         m = sum( X(1:end-1,:) ,1) .* 1/n;
         m = shiftInBox(m,low,upp); % boundary check
-        if doPlot; pM = plot(m(1),m(2),'go'); end
         
         % reflect
         r = ( 1+rho ).*m - rho.*X(end,:);
         r = projectOnBounds(X(end,:), r, m, rho, low, upp); % boundary check
         fr = fn( r );
         nF = nF+1;
-        if doPlot; pR = plot(r(1),r(2),'mo'); end
         
         if fr < fX(1)
             % expand
@@ -130,7 +60,6 @@ while restarts <= maxRestarts
             e = projectOnBounds(X(end,:), e, m, rho*chi, low, upp); % boundary check
             fe = fn( e );
             nF = nF+1;
-            if doPlot; pE = plot(e(1),e(2),'cx'); end
             
             if fe < fr
                 % accept e
@@ -152,7 +81,6 @@ while restarts <= maxRestarts
             c = ( 1+ gamma*rho ).*m - gamma*rho*X(end-1,:);
             fc = fn( c );
             nF = nF+1;
-            if doPlot; pC = plot(c(1),c(2),'yx'); end
             
             if fc < fr
                 % accept c
@@ -168,7 +96,7 @@ while restarts <= maxRestarts
             c = ( 1-gamma ).*m + gamma.*X(end,:);
             fc = fn( c );
             nF = nF+1;
-            if doPlot; pC = plot(c(1),c(2),'yx'); end
+            
             if fc < fX(end)
                 % if better than x(end), accept. if not, shrink
                 X(end,:) = c;
@@ -181,15 +109,6 @@ while restarts <= maxRestarts
         end
         % calculate standard deviation of function values
         s = std(fX);
-        % delete from plot
-        if doPlot
-            pause(0.5)
-            delete(pS)
-            delete(pM)
-            if exist('pC','var');delete(pC);end
-            if exist('pE','var');delete(pE);end
-            if exist('pR','var');delete(pR);end
-        end
         tries = tries-1;
     end
        
@@ -241,10 +160,6 @@ if restarts > maxRestarts
     err = sprintf('maximum number of restarts exceeded (%d). last best values returned', maxRestarts);
 end
 
-end
-
-function plotObj = plotSimplex(X)
-    plotObj = plot( [X(:,1);X(1,1)] , [X(:,2);X(1,2)] ,'r');
 end
 
 function p = projectOnBounds(x, p0, m, scale, lBound, uBound)
