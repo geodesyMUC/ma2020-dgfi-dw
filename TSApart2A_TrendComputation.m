@@ -230,21 +230,23 @@ end
 
 %% Parameter Estimation
 for j = 1:3 % E-N-U
+    params.t        = t;            % t in years where t0=beginning of TS
+    params.b        = data{:,j+2};  % vector with metric (coordinate)
+    params.poly     = polynDeg(j);  % polynome degree
+    params.w        = oscW{j};      % periods
+    params.jt       = heavJumps{j}; % jumps: time in years relative to t0
+    params.tst      = transients{j};% eq transients: time in years since t0
+    params.tstype   = tauTypes{j};  % type (function) of tau (log|exp)
+    params.kk       = KK;           % n of iterations for IRLS
+    params.p        = p;            % L_p Norm for IRLS
+    params.outl     = outlFactor;   % median(error) + standard deviation * factor -> outlier
+    
     for i = 1:length(tauCell{j})
         % LSE to get approximate parameters x0
+        % set up parameter struct
         fprintf('Evaluating "%s" ...\n', coordinateName{j});
-        [y, result_parameterC, xEst, ~] = computeTrendIRLS(... % trend, rms/wrms, parameters, outlier logical
-            t, ...                  % t in years where t0=beginning of TS
-            data{:, j + 2}, ...     % vector with metric (coordinate)
-            polynDeg(j), ...        % polynome degree
-            oscW{j}, ...            % periods
-            heavJumps{j}, ...       % jumps: time in years since t0
-            transients{j}, ...      % eq transients: time in years since t0
-            tauCell{j}{i}, ...      % transient parameter tau
-            tauTypes{j},...         % type (function) of tau 2(log|exp)
-            KK, ...                 % n of iterations for IRLS
-            p, ...                  % L_p Norm for IRLS
-            outlFactor);            % median(error) + standard deviation * factor -> outlier
+        params.tau      = tauCell{j}{i};% transient parameter tau
+        [y, result_parameterC, xEst, ~] = computeTrendIRLS(params);
         
         % results: [RMS,WRMS,Params]
         resultCell{j}(i,:) = [result_parameterC{1,2}, result_parameterC{1,2}, xEst'];
