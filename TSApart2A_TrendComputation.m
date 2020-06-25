@@ -49,16 +49,16 @@ doSaveResults = false; % save pngs and result files
 % stationName = 'PBJP';
 
 % stationName = '21701S007A03'; % KSMV %[ok]
-stationName = '21702M002A07'; % MIZU %[ok]
+% stationName = '21702M002A07'; % MIZU %[ok]
 % stationName = '21729S007A04'; % USUDA %[ok]
 % stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
-% stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
+stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
 % stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
 % stationName = '41719M004A02'; % Concepcion %[ok]
 
 %%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-polynDeg = [-1, -1, -1];% Polynomial Trend,Integer Degree, Range [-1..3]
+polynDeg = [1, 1, 1];% Polynomial Trend,Integer Degree, Range [-1..3]
 % periods / oscillations in YEARS (=365.25 days) in vector form
 osc = {[], [], []};     % common values: 0.5y, 1y
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
@@ -229,25 +229,25 @@ end
 % end
 
 %% Parameter Estimation
-for j = 1:3 % E-N-U
-    params.t        = t;            % t in years where t0=beginning of TS
-    params.b        = data{:,j+2};  % vector with metric (coordinate)
-    params.poly     = polynDeg(j);  % polynome degree
-    params.w        = oscW{j};      % periods
-    params.jt       = heavJumps{j}; % jumps: time in years relative to t0
-    params.tst      = transients{j};% eq transients: time in years since t0
-    params.tstype   = tauTypes{j};  % type (function) of tau (log|exp)
-    params.kk       = KK;           % n of iterations for IRLS
-    params.p        = p;            % L_p Norm for IRLS
-    params.outl     = outlFactor;   % median(error) + standard deviation * factor -> outlier
-    
+for j = 1:3 % E-N-U  
     for i = 1:length(tauCell{j})
         % LSE to get approximate parameters x0
         % set up parameter struct
         fprintf('Evaluating "%s" ...\n', coordinateName{j});
         params.tau      = tauCell{j}{i};% transient parameter tau
-        [y, result_parameterC, xEst, ~] = computeTrendIRLS(params);
-        
+        [y, result_parameterC, xEst, ~] = computeTrendIRLS(... % trend, rms/wrms, parameters, outlier logical 
+            t, ...                  % t in years where t0=beginning of TS 
+            data{:, j + 2}, ...     % vector with metric (coordinate) 
+            polynDeg(j), ...        % polynome degree 
+            oscW{j}, ...            % periods 
+            heavJumps{j}, ...       % jumps: time in years since t0 
+            transients{j}, ...      % eq transients: time in years since t0 
+            tauCell{j}{i}, ...      % transient parameter tau 
+            tauTypes{j},...         % type (function) of tau 2(log|exp) 
+            KK, ...                 % n of iterations for IRLS 
+            p, ...                  % L_p Norm for IRLS 
+            outlFactor...           % median(error) + standard deviation * factor -> outlier 
+            );
         % results: [RMS,WRMS,Params]
         resultCell{j}(i,:) = [result_parameterC{1,2}, result_parameterC{1,2}, xEst'];
     end
@@ -295,13 +295,47 @@ for i = 1:3 % E-N-U
         resultGrid = reshape(resultCell{i}(:,1), length(tauVec2), length(tauVec1) );
         figure
         colormap(flipud(parula)) % low error = good
-        contourf(days(years(tauVec1)),days(years(tauVec2)),resultGrid);
+%         contourf(days(years(tauVec1)),days(years(tauVec2)),resultGrid);
+        contourf(tauVec1,tauVec2,resultGrid);
         xlabel('\tau_{log1}SHORT [days]')
         ylabel('\tau_{log2}LONG [days]')
         title(["\tau parameter space for ", coordinateName{i}])
         c = colorbar;
         c.Label.String = 'RMS';
+        xlim([min(tauVec1) , max(tauVec1)])
+        ylim([min(tauVec2) , max(tauVec2)])
+        hold off
     end
+    
+    % optimization
+    restartScale = 0.01; % 
+    tol = 0.001;
+    lLim = [min(tauVec1), min(tauVec2)];
+    uLim = [max(tauVec1), max(tauVec2)];
+    x0 = [ min(tauVec1) + 0.0*(max(tauVec1)-min(tauVec1)) ,...
+        min(tauVec2) + 0.0*(max(tauVec2)-min(tauVec2)) ];
+    steps = [max(tauVec1)-min(tauVec1), max(tauVec2)-min(tauVec2)];
+    optFun = @(x) getTrendError(... % anonymous fct
+        t, ...                  % t in years where t0=beginning of TS
+        data{:, i + 2}, ...     % vector with metric (coordinate)
+        polynDeg(i), ...        % polynome degree
+        oscW{i}, ...            % periods
+        heavJumps{i}, ...       % jumps: time in years since t0
+        transients{i}, ...      % eq transients: time in years since t0
+        x, ...                  % transient parameter tau
+        tauTypes{i},...         % type (function) of tau 2(log|exp)
+        KK, ...                 % n of iterations for IRLS
+        p, ...                  % L_p Norm for IRLS
+        outlFactor...           % median(error) + standard deviation * factor -> outlier );
+        );
+    [xMin{i},fxMin(i),nFnCalls(i),nRestarts(i),~] = ...
+        dhscopt(optFun, x0, steps, lLim, uLim, tol, restartScale, false);
+    
+    options = optimoptions(@fmincon,...
+    'Display','iter','Algorithm','interior-point');
+    [xMin_{i},fxMin_{i}] = fmincon(optFun,x0,...
+    [],[],[],[],lLim,uLim,[],options);
+
 end
 
 % save results, write logs
@@ -409,3 +443,8 @@ end
 %%
 fprintf('Done!\n')
 % close all
+
+function out = getTrendError(x, b, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor)
+[~,results,~,~] = computeTrendIRLS(x, b, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor);
+out = results{cellfun(@(x) strcmp(x,'rms'), results(:,1)),2};
+end
