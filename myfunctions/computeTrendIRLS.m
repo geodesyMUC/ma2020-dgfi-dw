@@ -38,8 +38,27 @@ end
 fprintf('n of iterations for IRLS = %d,\np of L_p Norm for IRLS = %.2f,\nOutlier Factor = %d (mean of error + standard deviation * factor < outlier)\n', ...
     KK, p, outl_factor);
 
-if length(tau) ~= size(tsType,1)
-    error('length of tau vector for transients does not match length of type of tau vector')
+if size(tau,2) ~= size(tsType,1)
+    % try reshaping it (order of elements in tau is important!)
+    % from [tau_1.1, tau_1.2, ... , tau_nEQ.1, tau_nEQ.2] to matrix
+    if size(tau,2)/size(tsType,1) == length(ts_t) % assume ok: -> reshape
+        % possible error: if they match by chance, computation will resume
+        tau = reshape(tau, [length(ts_t), size(tsType,1)]);
+        if size(tsType,1)>1
+            tau = tau'; % so that rows->eq & cols->transients
+        end
+        doLocalTau = true;              % 1 set of tau for each eq (local)
+    else % assume error: dim mismatch -> abandon
+        error('transient error: n of tau per event does not match length of type of tau vector')
+    end
+else % assume col count matches, continue row check 
+    if size(tau,1) == 1                 % ok, 1 set of tau for all eq (global)
+        doLocalTau = false;
+    elseif size(tau,1) == length(ts_t)  % ok, 1 set of tau for each eq (local)
+        doLocalTau = true;
+    else                                % error
+        error('transient error: n of tau does not match n of eq events OR is not 1')
+    end
 end
 
 % convert datetimes from [seconds] to [years]
@@ -53,7 +72,7 @@ nPolynTerms = polynDeg+1; % 0, 1, 2, ...
 nPeriodic = length(W); % oscillations
 nPeriodicCoeff = nPeriodic*2; % cos & sin components (C, S) for every oscillation
 nJumpCoeff = length(j_t); % All Jumps - From DB and ITRF (if set to true)
-nEqParam = length(ts_t)*length(tau); % number of eq jumps -> transient * number of T
+nEqParam = length(ts_t)*size(tau,2); % number of amplitudes for transients -> transient * number of eq
 
 % Set up Map N: n of Parameter Storage Vector
 N(1) = 0;
@@ -93,22 +112,26 @@ for i = 1:length(ts_t)
     dt = x - ts_t(i);
     dt(dt < 0) = 0; % Every observation BEFORE the event
     if size(tau,2) > 0
+        if doLocalTau; iEq = i; % local tau
+        else; iEq = 1;          % global tau
+        end
+        
         % Choose function for Transient 1
         if strcmp(tsType(1,:),'log')
-            A(:, N(4)+cnt  ) = log( 1 + dt./tau(1) ); % logarithmic transient 1
+            A(:, N(4)+cnt  ) = log( 1 + dt./tau(iEq, 1) ); % logarithmic transient 1
         elseif strcmp(tsType(1,:),'exp')
-            A(:, N(4)+cnt )       = exp(-dt./tau(1)); % exponential transient 1
+            A(:, N(4)+cnt )  = exp(-dt./tau(iEq, 1));      % exponential transient 1
         end
         if size(tau,2) > 1
             % Choose function for Transient 2
             if strcmp(tsType(2,:),'log')
-                A(:, N(4)+cnt+1 ) = log( 1 + dt./tau(2) ); % logarithmic transient 2
+                A(:, N(4)+cnt+1 ) = log( 1 + dt./tau(iEq, 2) ); % logarithmic transient 2
             elseif strcmp(tsType(2,:),'exp')
-                A(:, N(4)+cnt+1 ) = exp(-dt./tau(2)); % exponential transient 2
+                A(:, N(4)+cnt+1 ) = exp(-dt./tau(iEq, 2));      % exponential transient 2
             end
         end
     end
-    cnt=cnt+length(tau);
+    cnt=cnt+size(tau,2);
 end
 
 %% (1) Calculate initial parameters xEst from A, b

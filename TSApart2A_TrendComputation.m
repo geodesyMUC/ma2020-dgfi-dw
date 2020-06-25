@@ -67,7 +67,7 @@ doEQjump    = [true true true]; % E-N-U
 % specify type of transient: "log","exp","nil"
 transientType = {...
     'log','log'; ...    % coordinate1:E|X
-    'log','log'; ...    % coordinate2:N|Y
+    '','log'; ...    % coordinate2:N|Y
     'log','log'};       % coordinate3:U|Z
 
 % Parameter tau in [years] for computation of logarithmic transient for
@@ -184,23 +184,26 @@ tauCell = cell(3,1);
 tauTypes = cell(3,1);
 for i = 1:3 % E-N-U
     if any(strcmp( transientType{i,1} , tsFctStr )) &&  any(strcmp( transientType{i,2} , tsFctStr ))
-        [tauGrid1, ...
-            TauGrid2] = meshgrid(tauVec1, tauVec2); % create two grids
-        tauGrid       = cat(2, tauGrid1, TauGrid2); % cat along 2nd dimension
+        [tauGrid1, tauGrid2] = meshgrid(tauVec1, tauVec2); % create two grids
+        tauGrid       = cat(2, tauGrid1, tauGrid2); % cat along 2nd dimension
         tauVec = reshape(tauGrid, [], 2);           % reshape to 2 col vector with rows (tau1, tau2)
         tauCell{i} = num2cell(tauVec,2);
         tauTypes{i} = [ transientType{i,1};transientType{i,2} ];
+        tauN(i) = 2;
     elseif any(strcmp( transientType{i,1} , tsFctStr )) && ~any(strcmp( transientType{i,2} , tsFctStr ))
         tauTypes{i} = [ transientType{i,1} ];
         tauVec        = tauVec1';
         tauCell{i} = num2cell(tauVec,2);
+        tauN(i) = 1;
     elseif ~any(strcmp( transientType{i,1} , tsFctStr )) &&  any(strcmp( transientType{i,2} , tsFctStr ))
         tauTypes{i} = [ transientType{i,2} ];
         tauVec        = tauVec2';
         tauCell{i} = num2cell(tauVec,2);
+        tauN(i) = 1;
     else % no match found, no transient to be estimated
         tauTypes{i} = '';
         tauCell{i} = {[]};
+        tauN(i) = 0;
     end
 %     tauCell{i} = tauVec;
 end
@@ -210,7 +213,7 @@ for i = 1:3 % E-N-U
     nPolynTerms(i) = polynDeg(i) + 1; % 0, 1, 2, ...
     nOscParam(i)   = length(oscW{i}) * 2; % cos & sin components (C, S) for every oscillation
     nJumps(i)      = length(heavJumps{i}); % All Jumps - From DB and ITRF (if set to true)
-    nTransients(i) = length(transients{i}) * (size(tauCell{i}{1},2)); % Only EQ Jumps -> n of transients
+    nTransients(i) = length(transients{i}) * tauN(i); % Only EQ Jumps -> n of transients
 end
 
 % prepare array to store results rms,wrms,est.params FOR EVERY COMBINATION
@@ -220,13 +223,6 @@ for i = 1:3 % E-N-U
     resultCell{i} = zeros(size(tauCell{i},1), 2+nPolynTerms(i)+nOscParam(i)+nJumps(i)+nTransients(i) );
 end
 
-%% Write Input Parameters to log file
-% for i = 1:3 % E-N-U
-%     writeInputLog(fID, stationName, coordinateName{i}, data{:, 'date'}, ...
-%         polynDeg(i), osc{i}, heavJumps{i}, ...
-%         transients{i}, cell2mat(tauCell{i}), tauTypes{i}, ...
-%         KK, p, outlFactor);
-% end
 
 %% Parameter Estimation
 for j = 1:3 % E-N-U  
@@ -234,7 +230,6 @@ for j = 1:3 % E-N-U
         % LSE to get approximate parameters x0
         % set up parameter struct
         fprintf('Evaluating "%s" ...\n', coordinateName{j});
-        params.tau      = tauCell{j}{i};% transient parameter tau
         [y, result_parameterC, xEst, ~] = computeTrendIRLS(... % trend, rms/wrms, parameters, outlier logical 
             t, ...                  % t in years where t0=beginning of TS 
             data{:, j + 2}, ...     % vector with metric (coordinate) 
@@ -283,6 +278,18 @@ for i = 1:3 % E-N-U
         );
 end
 
+% optimization setup
+restartScale = 0.01; %
+tol = 0.001;
+for i = 1:3 % E-N-U
+    nEq = length(transients{i});
+    tauArray = cell2mat(tauCell{i});
+    lLim{i}  = repmat(min(tauArray), 1, nEq);
+    uLim{i}  = repmat(max(tauArray), 1, nEq);
+    x0{i}    = repmat(min(tauArray), 1, nEq);
+    steps{i} = repmat(max(tauArray), 1, nEq) - repmat(min(tauArray), 1, nEq); % if max(tauArray)==inf?
+end
+
 % create map plot for tau
 for i = 1:3 % E-N-U
     if size(tauCell{i}{1},2) == 1 % 1 tau
@@ -308,13 +315,6 @@ for i = 1:3 % E-N-U
     end
     
     % optimization
-    restartScale = 0.01; % 
-    tol = 0.001;
-    lLim = [min(tauVec1), min(tauVec2)];
-    uLim = [max(tauVec1), max(tauVec2)];
-    x0 = [ min(tauVec1) + 0.0*(max(tauVec1)-min(tauVec1)) ,...
-        min(tauVec2) + 0.0*(max(tauVec2)-min(tauVec2)) ];
-    steps = [max(tauVec1)-min(tauVec1), max(tauVec2)-min(tauVec2)];
     optFun = @(x) getTrendError(... % anonymous fct
         t, ...                  % t in years where t0=beginning of TS
         data{:, i + 2}, ...     % vector with metric (coordinate)
@@ -329,12 +329,12 @@ for i = 1:3 % E-N-U
         outlFactor...           % median(error) + standard deviation * factor -> outlier );
         );
     [xMin{i},fxMin(i),nFnCalls(i),nRestarts(i),~] = ...
-        dhscopt(optFun, x0, steps, lLim, uLim, tol, restartScale, false);
+        dhscopt(optFun, x0{i}, steps{i}, lLim{i}, uLim{i}, tol, restartScale, false);
     
     options = optimoptions(@fmincon,...
     'Display','iter','Algorithm','interior-point');
-    [xMin_{i},fxMin_{i}] = fmincon(optFun,x0,...
-    [],[],[],[],lLim,uLim,[],options);
+    [xMin_{i},fxMin_{i}] = fmincon(optFun,x0{i},...
+    [],[],[],[],lLim{i},uLim{i},[],options);
 
 end
 
