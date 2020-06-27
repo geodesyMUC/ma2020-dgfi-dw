@@ -139,8 +139,8 @@ t0 = data{1, 'date'}; % beginning of ts as datetime
 oscW = cellfun(@(x) 2*pi./x, osc, 'UniformOutput', false);
 
 % preallocate
-heavJumps  = cell(3,1); % Heaviside Jump cells for the 3 coordinates E,N,U
-transients = cell(3,1); % Transient cells for the 3 coordinates E,N,U 
+heavJumps  = cell(3,1); % Heaviside Jumps for the 3 coordinates E,N,U
+transients = cell(3,1); % Transients for the 3 coordinates E,N,U 
 
 % load tables
 % Distinguish between EQs (invokes transient) and other jumps (do not invoke transient)
@@ -285,7 +285,7 @@ for i = 1:3 % E-N-U
 end
 
 %% Mapping&Parameter Optimization (DHS/IP)
-restartScale = 0.001; %
+restartScale = 0.01; %
 tol = 0.001;
 for i = 1:3 % E-N-U
     nEq = length(transients{i});

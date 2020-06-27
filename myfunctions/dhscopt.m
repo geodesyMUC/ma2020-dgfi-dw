@@ -167,6 +167,7 @@ while restarts <= maxRestarts
             fxTest = fn(xTest);
             nF = nF+1;
             if fxTest < fxOpt
+                doRightShift = true;
                 doRestart = true;
                 break
             end
@@ -179,6 +180,7 @@ while restarts <= maxRestarts
             fxTest = fn(xTest);
             nF = nF+1;
             if fxTest < fxOpt
+                doRightShift = false;
                 doRestart = true;
                 break
             end
@@ -189,7 +191,11 @@ while restarts <= maxRestarts
         % assume local minimum, restart
         % adapt stepScale, xInit
         xInit = xTest;
-        stepScale = restartScale; % scale next initial simplex
+        if doRightShift
+            stepScale = restartScale; % scale next initial simplex (right shift)
+        else
+            stepScale = -restartScale; % scale next initial simplex (left shift)
+        end
         fprintf('RESTART\n');
         restarts = restarts + 1;
     else
