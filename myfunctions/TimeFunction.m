@@ -26,12 +26,14 @@ if size(tau,2) ~= size(tsType,1)
     if size(tau,2)/size(tsType,1) == length(ts_t) % assume ok: -> reshape
         % possible error: if they match by chance, computation will resume
         tau = reshape(tau, [length(ts_t), size(tsType,1)]);
-        tau = tau'; % so that rows->eq & cols->transients
+        if size(tsType,1)>1
+            tau = tau'; % so that rows->eq & cols->transients
+        end
         doLocalTau = true;              % 1 set of tau for each eq (local)
     else % assume error: dim mismatch -> abandon
         error('transient error: n of tau per event does not match length of type of tau vector')
     end    
-else % assume col count matches, continue row check 
+elseif ~isempty(tau) % assume col count matches, continue row check 
     if size(tau,1) == 1                 % ok, 1 set of tau for all eq (global)
         doLocalTau = false;
     elseif size(tau,1) == length(ts_t)  % ok, 1 set of tau for each eq (local)

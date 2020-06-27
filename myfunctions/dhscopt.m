@@ -2,6 +2,7 @@ function [xOpt, fxOpt, nF, restarts, err] = dhscopt(fn, xInit, L, low, upp, tol,
 err = '';
 
 n = length(xInit);  % dimension of problem
+
 chi = 2;            % expansion
 gamma = 0.5;        % contraction
 sigma = 0.5;        % shrinkage/compression
@@ -19,7 +20,16 @@ if doPlot; plot(xInit(1),xInit(2),'kx'); end
 
 maxRestarts = 5;
 restarts = 0;
-% Restart Loop
+% Catch case where no parameters are to be optimized
+if n == 0
+    err = 'optimization warning: no parameters to be optimized, returning default function value';
+    xOpt = [];
+    fxOpt = fn([]);
+    nF = 1;
+    return
+end
+
+%% Main Restart Loop
 while restarts <= maxRestarts
     % Set up initial Simplex (axis by axis approach)
     x_ = [xInit; zeros(n+1-1, n)];

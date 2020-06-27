@@ -20,50 +20,63 @@ t_end = t(end);
 fprintf(fID, '### INPUT: Station %s, Coordinate "%s" ###\n', stationname, coordinateName);
 fprintf(fID, 'Time Series Start t_0  = %s\n', datestr(t0, 'yyyy-mm-dd HH:MM'));
 fprintf(fID, 'Time Series End t_end  = %s\n\n', datestr(t_end, 'yyyy-mm-dd HH:MM'));
+
 % polynomial model
 if polynDeg<0; polynStr='none estimated'; else; polynStr=sprintf('%d', polynDeg); end
 fprintf(fID, 'Degree of Polynomial:\n%s\n\n', polynStr) ;
+
 % oscillation model
-if isempty(P); oscStr=['none estimated', '\n']; else; ...
-        oscStr=sprintf('%.1fy | %.2fd\n', [P; P.*365.25]); end
-fprintf(fID, 'Oscillations:\n%s\n', oscStr);
+if isempty(P)
+    strW = sprintf('%s\n', 'none estimated');
+else
+    strW = sprintf('%.1fy | %.2fd\n', [P; P.*365.25]);
+end
+fprintf(fID, 'Oscillations:\n%s\n', strW);
+
 % heaviside jump model
-fprintf(fID, 'Heaviside Jumps [Relative Time - Datetime]:');
-if isempty(HJumps); fprintf(fID, '\nnone estimated');end
-fprintf(fID, '\n');
-for i = 1:length(HJumps)
-    % Print Jump Datetime Information
-    fprintf(fID, 't0 + %.2fs | %s\n', HJumps(i), ...
-        datestr(t0 + seconds(HJumps(i)), 'yyyy-mm-dd HH:MM'));
+if isempty(HJumps)
+    strJ = sprintf('%s\n', 'none estimated');
+else
+    for i = 1:length(HJumps)
+        % Print Jump Datetime Information
+        strJ = sprintf('t0 + %.2fs | %s\n', HJumps(i), ...
+            datestr(t0 + seconds(HJumps(i)), 'yyyy-mm-dd HH:MM'));
+    end
 end
+fprintf(fID, 'Heaviside Jumps [Relative Time - Datetime]:\n%s\n', strJ);
+
 % transient model - datetimes
-fprintf(fID, '\nTransients [Relative Time - Datetime - Type of Transient]:');
-if isempty(t_trans); fprintf(fID,'\nnone estimated');end
-for i = 1:length(t_trans)
-    transPrint = cellstr(transType);
-    % Print Jump Datetime Information
-    fprintf(fID, '\nt0 + %.2fs | %s | %s ', t_trans(i), ...
-        datestr(t0 + seconds(t_trans(i)), 'yyyy-mm-dd HH:MM'), ...
-        sprintf('%s ', transPrint{:})...
-        );
+if isempty(t_trans)
+    strTs = sprintf('%s\n', 'none estimated');
+else
+    for i = 1:length(t_trans)
+        transPrint = cellstr(transType);
+        % Print Jump Datetime Information
+        strTs = sprintf('t0 + %.2fs | %s | %s \n', t_trans(i), ...
+            datestr(t0 + seconds(t_trans(i)), 'yyyy-mm-dd HH:MM'), ...
+            sprintf('%s ', transPrint{:})...
+            );
+    end
 end
+fprintf(fID, 'Transients [Relative Time - Datetime - Type of Transient]:\n%s\n', strTs);
 
 % transient model - tau values
-fprintf(fID, '\n\nTransient 1 Range [Lower Bound | Upper Bound]:\n'); % 1st Transient
 if isempty(taus)
-    fprintf(fID,'not estimated\n');
+    strT1 = sprintf('%s\n', 'none estimated');
 else
-    fprintf(fID, '%dd | %dd\n', days(years(min(taus(:,1)))), days(years(max(taus(:,1)))));
+    strT1 = sprintf('%dd ; %dd\n', days(years(min(taus(:,1)))), days(years(max(taus(:,1)))));
 end
-fprintf(fID, '\nTransient 2 Range [Lower Bound | Upper Bound]:\n');   % 2nd Transient
+fprintf(fID, 'Transient 1 Range [Lower Bound ; Upper Bound]:\n%s\n', strT1); % 1st Transient
+
 if size(taus,2)<2
-    fprintf(fID,'not estimated\n');
+    strT2 = sprintf('%s\n', 'none estimated');
 else
-    fprintf(fID, '%dd | %dd\n', days(years(min(taus(:,2)))), days(years(max(taus(:,2)))));
+    strT2 = sprintf('%dd ; %dd\n', days(years(min(taus(:,2)))), days(years(max(taus(:,2)))));
 end
+fprintf(fID, 'Transient 2 Range [Lower Bound ; Upper Bound]:\n%s\n', strT2);   % 2nd Transient
 
 % LSE/IRLSE
-fprintf(fID, ['\nIRLSE/LSE Parameters:\nKK = %d (n of Iterations in IRLSE)\np = %.1f (L_p Norm used for IRLS)\n', ...
+fprintf(fID, ['IRLSE/LSE Parameters:\nKK = %d (n of Iterations in IRLSE)\np = %.1f (L_p Norm used for IRLS)\n', ...
     'outl_factor = %d (median of error + standard deviation * factor < outlier)\n\n'], KK, p, outl_factor);
 end
 

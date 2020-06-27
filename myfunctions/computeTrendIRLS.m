@@ -13,6 +13,7 @@ function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, polynDeg, W
 %   p: L_p Norm for IRLS. p=2 equals to the euclidean norm (=L2). 
 %   If p=2, no reweighting will be applied, independent of the number of iterations KK
 %   outl_factor: median(error)|mean(error) + standard deviation * factor -> outlier
+doLog = false;
 
 if nargin == 1
     % assume input is parameter struct
@@ -32,11 +33,11 @@ elseif nargin <= 8
     KK = 0; % n of iterations for IRLS
     p = 2.0; % L_p Norm for IRLS
     outl_factor = 5; % median(error) + standard deviation * factor -> outlier
-    fprintf('No IRLS parameters defined. Calculating L2 norm LSE.\n')
+    if doLog;fprintf('No IRLS parameters defined. Calculating L2 norm LSE.\n');end
 end
 
-fprintf('n of iterations for IRLS = %d,\np of L_p Norm for IRLS = %.2f,\nOutlier Factor = %d (mean of error + standard deviation * factor < outlier)\n', ...
-    KK, p, outl_factor);
+if doLog; fprintf('n of iterations for IRLS = %d,\np of L_p Norm for IRLS = %.2f,\nOutlier Factor = %d (mean of error + standard deviation * factor < outlier)\n', ...
+    KK, p, outl_factor); end
 
 if size(tau,2) ~= size(tsType,1)
     % try reshaping it (order of elements in tau is important!)
@@ -51,7 +52,7 @@ if size(tau,2) ~= size(tsType,1)
     else % assume error: dim mismatch -> abandon
         error('transient error: n of tau per event does not match length of type of tau vector')
     end
-else % assume col count matches, continue row check 
+elseif ~isempty(tau) % assume col count matches, continue row check 
     if size(tau,1) == 1                 % ok, 1 set of tau for all eq (global)
         doLocalTau = false;
     elseif size(tau,1) == length(ts_t)  % ok, 1 set of tau for each eq (local)
@@ -83,7 +84,7 @@ N(5) = N(4) + nEqParam;
 
 %% set up design matrix A
 A = zeros(nData, N(5)); % initialize (measurements x unknown parameters)
-fprintf('Design Matrix A: %d x %d\n', size(A, 1), size(A, 2));
+if doLog; fprintf('Design Matrix A: %d x %d\n', size(A, 1), size(A, 2)); end
 
 % 1:POLYNOMIAL MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 for i = 0:polynDeg
@@ -169,7 +170,7 @@ WRMS_vector = [wrms];
 
 for k = 1:KK
     
-    fprintf('IRLS Iteration #%d\n', k);
+    if doLog;fprintf('IRLS Iteration #%d\n', k);end
     e(e==0) = 0.0001; % add small value to 0, so div by 0 is prevented
     [xEst, e, w] = computeWeightedLeastSquares(A, b, e, p);
     
@@ -208,7 +209,7 @@ results{1, 2} = rms;
 results{2, 1} = 'wrms';
 results{2, 2} = wrms;
 
-fprintf('WMRS = %.4f, RMS = %.4f\n', wrms, rms);
+if doLog;fprintf('WMRS = %.4f, RMS = %.4f\n', wrms, rms);end
 
 %% (5) sample equidistant values for TIME
 % -> for time series with LSE estimated parameters
@@ -312,7 +313,7 @@ try
     x = A \ B;
 catch
     % Using Moore Penrose Pseudoinverse with tolerance
-    fprintf('Using Moore-Penrose pseudoinverse for Inversion of normal equation matrix.\n');
+    if doLog; fprintf('Using Moore-Penrose pseudoinverse for Inversion of normal equation matrix.\n'); end
     x = pinv(A, 0.001) * B;
 end
 end

@@ -67,14 +67,14 @@ doEQjump    = [true true true]; % E-N-U
 % specify type of transient: "log","exp","nil"
 transientType = {...
     'log','log'; ...    % coordinate1:E|X
-    '','log'; ...    % coordinate2:N|Y
-    'log','log'};       % coordinate3:U|Z
+    'log',''; ...    % coordinate2:N|Y
+    '',''};       % coordinate3:U|Z
 
 % Parameter tau in [years] for computation of logarithmic transient for
 % earthquake events (jumps):
 % vector mapping different T (tau) relaxation coefficients
-tauVec1 = years(days(1:10:200));
-tauVec2 = years(days(250:30:730));
+tauVec1 = years(days(1:20:200));
+tauVec2 = years(days(250:40:730));
 % tauVec1 = years(days(1:5:365)); % full range tau
 
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
@@ -224,27 +224,26 @@ for i = 1:3 % E-N-U
 end
 
 
-%% Parameter Estimation
-for j = 1:3 % E-N-U  
+%% Parameter Estimation (Grid Search)
+params.t        = t;            % t in years where t0=beginning of TS
+params.kk       = KK;           % n of iterations for IRLS
+params.p        = p;            % L_p Norm for IRLS
+params.outl     = outlFactor;   % median(error) + standard deviation * factor -> outlier
+for j = 1:3 % E-N-U    
+    params.b        = data{:,j+2};  % vector with metric (coordinate)
+    params.poly     = polynDeg(j);  % polynome degree
+    params.w        = oscW{j};      % periods
+    params.jt       = heavJumps{j}; % jumps: time in years relative to t0
+    params.tst      = transients{j};% eq transients: time in years since t0 
+    params.tstype   = tauTypes{j};  % type (function) of tau (log|exp)
+    
     for i = 1:length(tauCell{j})
         % LSE to get approximate parameters x0
-        % set up parameter struct
-        fprintf('Evaluating "%s" ...\n', coordinateName{j});
-        [y, result_parameterC, xEst, ~] = computeTrendIRLS(... % trend, rms/wrms, parameters, outlier logical 
-            t, ...                  % t in years where t0=beginning of TS 
-            data{:, j + 2}, ...     % vector with metric (coordinate) 
-            polynDeg(j), ...        % polynome degree 
-            oscW{j}, ...            % periods 
-            heavJumps{j}, ...       % jumps: time in years since t0 
-            transients{j}, ...      % eq transients: time in years since t0 
-            tauCell{j}{i}, ...      % transient parameter tau 
-            tauTypes{j},...         % type (function) of tau 2(log|exp) 
-            KK, ...                 % n of iterations for IRLS 
-            p, ...                  % L_p Norm for IRLS 
-            outlFactor...           % median(error) + standard deviation * factor -> outlier 
-            );
+        params.tau      = tauCell{j}{i};% transient parameter tau 
+        fprintf('Evaluating "%s" ...\n', coordinateName{j}); 
+        [y, result_parameterC, xEst, ~] = computeTrendIRLS(params);
         % results: [RMS,WRMS,Params]
-        resultCell{j}(i,:) = [result_parameterC{1,2}, result_parameterC{1,2}, xEst'];
+        resultCell{j}(i,:) = [result_parameterC{1,2}, result_parameterC{2,2}, xEst'];
     end
 end
 
@@ -278,19 +277,32 @@ for i = 1:3 % E-N-U
         );
 end
 
-% optimization setup
-restartScale = 0.01; %
+% save results: GRID SEARCH
+for i = 1:3 % E-N-U
+    result_parameters{i, 1} = coordinateName{i};
+    result_parameters{i, 2} = ...
+        {'rms', resultCell{i}(BestIdx(i),1); 'wrms', resultCell{i}(BestIdx(i),2)}; % assign parameter cell to super cell
+end
+
+%% Mapping&Parameter Optimization (DHS/IP)
+restartScale = 0.001; %
 tol = 0.001;
 for i = 1:3 % E-N-U
     nEq = length(transients{i});
     tauArray = cell2mat(tauCell{i});
     lLim{i}  = repmat(min(tauArray), 1, nEq);
     uLim{i}  = repmat(max(tauArray), 1, nEq);
-    x0{i}    = repmat(min(tauArray), 1, nEq);
+    x0{i}    = repmat(min(tauArray)+1e-3, 1, nEq);
     steps{i} = repmat(max(tauArray), 1, nEq) - repmat(min(tauArray), 1, nEq); % if max(tauArray)==inf?
 end
 
-% create map plot for tau
+% create map plot for tau & optimization
+minRes = cell(3,1);
+for i = 1:3 % E-N-U
+    minRes{i} = zeros(1, 2+nPolynTerms(i)+nOscParam(i)+nJumps(i)+nTransients(i) );
+end
+minRes_ = minRes;
+
 for i = 1:3 % E-N-U
     if size(tauCell{i}{1},2) == 1 % 1 tau
         figure
@@ -315,131 +327,219 @@ for i = 1:3 % E-N-U
     end
     
     % optimization
+    params.b        = data{:,i+2};  % vector with metric (coordinate)
+    params.poly     = polynDeg(i);  % polynome degree
+    params.w        = oscW{i};      % periods
+    params.jt       = heavJumps{i}; % jumps: time in years relative to t0
+    params.tst      = transients{i};% eq transients: time in years since t0 
+    params.tstype   = tauTypes{i};  % type (function) of tau (log|exp)
+    
     optFun = @(x) getTrendError(... % anonymous fct
-        t, ...                  % t in years where t0=beginning of TS
-        data{:, i + 2}, ...     % vector with metric (coordinate)
-        polynDeg(i), ...        % polynome degree
-        oscW{i}, ...            % periods
-        heavJumps{i}, ...       % jumps: time in years since t0
-        transients{i}, ...      % eq transients: time in years since t0
-        x, ...                  % transient parameter tau
-        tauTypes{i},...         % type (function) of tau 2(log|exp)
-        KK, ...                 % n of iterations for IRLS
-        p, ...                  % L_p Norm for IRLS
-        outlFactor...           % median(error) + standard deviation * factor -> outlier );
+        params.t, ...     % t in years where t0=beginning of TS
+        params.b, ...     % vector with metric (coordinate)
+        params.poly, ...  % polynome degree
+        params.w, ...     % periods
+        params.jt, ...    % jumps: time in years since t0
+        params.tst, ...   % eq transients: time in years since t0
+        x, ...            % transient parameter tau
+        params.tstype,... % type (function) of tau 2(log|exp)
+        params.kk, ...    % n of iterations for IRLS
+        params.p, ...     % L_p Norm for IRLS
+        params.outl...    % median(error) + standard deviation * factor -> outlier );
         );
+    
+    % custom method
     [xMin{i},fxMin(i),nFnCalls(i),nRestarts(i),~] = ...
         dhscopt(optFun, x0{i}, steps{i}, lLim{i}, uLim{i}, tol, restartScale, false);
+    % function call to estimate best parameters
+    params.tau = xMin{i};% transient parameter tau
+    [~, result_parameterC, xEst, ~] = computeTrendIRLS( params );
+    % results: [RMS,WRMS,Params]
+    minRes{i} = [result_parameterC{1,2}, result_parameterC{2,2}, xEst'];
     
-    options = optimoptions(@fmincon,...
-    'Display','iter','Algorithm','interior-point');
-    [xMin_{i},fxMin_{i}] = fmincon(optFun,x0{i},...
-    [],[],[],[],lLim{i},uLim{i},[],options);
-
+    % MATLAB method
+    if ~isempty(x0{i})
+        options = optimoptions(@fmincon,...
+            'Display','iter','Algorithm','interior-point');
+        [xMin_{i},fxMin_{i}] = fmincon(optFun,x0{i},...
+            [],[],[],[],lLim{i},uLim{i},[],options);
+    else
+        xMin_{i} = [];
+    end
+    % function call to estimate best parameters
+    params.tau = xMin_{i};% transient parameter tau
+    [~, result_parameterC, xEst, ~] = computeTrendIRLS( params );
+    % results: [RMS,WRMS,Params]
+    minRes_{i} = [result_parameterC{1,2}, result_parameterC{2,2}, xEst'];
 end
 
-% save results, write logs
+% compute time series based on optimized solution for ENU
+minTrend = [];
+minTrend_ = [];
 for i = 1:3 % E-N-U
-    result_parameters{i, 1} = coordinateName{i};
-    result_parameters{i, 2} = ...
-        {'rms', resultCell{i}(BestIdx(i),1); 'wrms', resultCell{i}(BestIdx(i),2)}; % assign parameter cell to super cell
+    oscCS = minRes{i}(3+nPolynTerms(i) : 3+nPolynTerms(i)+nOscParam(i)-1);
+    oscCS = [oscCS(1:2:end); oscCS(2:2:end)]; % reorder cosine/sine components
+    % dhs
+    minTrend(:, i) = TimeFunction(years(seconds(t)), ...
+        minRes{i}( 3 : 3+nPolynTerms(i)-1 ), ...
+        oscCS, ...      % rearranged oscillation amplitudes (cosine, sine)
+        osc{i}, ...     % periods
+        years(seconds(heavJumps{i})), ...
+        minRes{i}(3+nPolynTerms(i)+nOscParam(i) : 3+nPolynTerms(i)+nOscParam(i)+nJumps(i)-1), ...
+        years(seconds(transients{i})), ...
+        minRes{i}(3+nPolynTerms(i)+nOscParam(i)+nJumps(i) : end), ...
+        xMin{i},...     % opt for tau
+        tauTypes{i}...
+        );
+    % ip
+    minTrend_(:, i) = TimeFunction(years(seconds(t)), ...
+        minRes{i}( 3 : 3+nPolynTerms(i)-1 ), ...
+        oscCS, ...      % rearranged oscillation amplitudes (cosine, sine)
+        osc{i}, ...     % periods
+        years(seconds(heavJumps{i})), ...
+        minRes{i}(3+nPolynTerms(i)+nOscParam(i) : 3+nPolynTerms(i)+nOscParam(i)+nJumps(i)-1), ...
+        years(seconds(transients{i})), ...
+        minRes{i}(3+nPolynTerms(i)+nOscParam(i)+nJumps(i) : end), ...
+        xMin{i},...     % opt for tau
+        tauTypes{i}...
+        );
 end
 
-%% Write Trend Results to files
-% Open Log File and get identifier
-logFile = [stationName,'.', datestr(datetime('now'),'yyyy-mm-dd_HH-MM-SS'),'.log']; % output: log file name
-fID = fopen(fullfile(logFileFolder, logFile), 'wt');
+% save results: OPTIMIZATION
+minError = cell(3, 2);
+minError_ = cell(3, 2);
 for i = 1:3 % E-N-U
-    writeInputLog(fID, stationName, coordinateName{i}, data{:, 'date'}, ...
-        polynDeg(i), osc{i}, heavJumps{i}, ...
-        transients{i}, cell2mat(tauCell{i}), tauTypes{i}, ...
-        KK, p, outlFactor);
-    writeOutputLog(fID, dataStation, coordinateName{i}, ...
-        resultCell{i}(BestIdx(i), 3 : 3+nPolynTerms(i)-1 ), ...
-        oscCS, ...
-        resultCell{i}(BestIdx(i), 3+nPolynTerms(i)+nOscParam(i) : 3+nPolynTerms(i)+nOscParam(i)+nJumps(i)-1), ...
-        resultCell{i}(BestIdx(i), 3+nPolynTerms(i)+nOscParam(i)+nJumps(i) : end), ...
-        tauCell{i}{BestIdx(i)}, ...
-        resultCell{i}(BestIdx(i),1), resultCell{i}(BestIdx(i),2)...
+    % dhs
+    minError{i, 1} = coordinateName{i};
+    minError{i, 2} = ...
+        {'rms', minRes{i}(1); 'wrms', minRes{i}(2)}; % assign parameter cell to super cell
+    % ip
+    minError_{i, 1} = coordinateName{i};
+    minError_{i, 2} = ...
+        {'rms', minRes{i}(1); 'wrms', minRes{i}(2)}; % assign parameter cell to super cell
+end
+
+%% Evaluation
+currTime = datestr(datetime('now'),'yyyy-mm-dd_HH-MM-SS');
+for j = 1:3 % grid search-dhs-ip
+    if j == 1
+        method = 'gs';
+        optParams{1} = resultCell{1}(BestIdx(1),:);
+        optParams{2} = resultCell{2}(BestIdx(2),:);
+        optParams{3} = resultCell{3}(BestIdx(3),:);
+        optTrends = trenddata;
+        optTau{1} = tauCell{1}{BestIdx(1)};
+        optTau{2} = tauCell{2}{BestIdx(2)};
+        optTau{3} = tauCell{3}{BestIdx(3)};
+    elseif j == 2
+        method = 'dhs';
+        optParams = minRes;
+        optTrends = minTrend;
+        optTau = xMin;
+    elseif j == 3
+        method = 'ip';
+        optParams = minRes_;
+        optTrends = minTrend_;
+        optTau = xMin_;
+    end
+    % Write to File
+    % Open Log File and get identifier
+    logFile = [stationName,'.', currTime,'.',method,'.log']; % output: log file name
+    fID = fopen(fullfile(logFileFolder, logFile), 'wt');
+    for i = 1:3 % E-N-U
+        writeInputLog(fID, stationName, coordinateName{i}, data{:, 'date'}, ...
+            polynDeg(i), osc{i}, heavJumps{i}, ...
+            transients{i}, cell2mat(tauCell{i}), tauTypes{i}, ...
+            KK, p, outlFactor);
+        writeOutputLog(fID, dataStation, coordinateName{i}, ...
+            optParams{i}(3 : 3+nPolynTerms(i)-1 ), ...
+            oscCS, ...
+            optParams{i}(3+nPolynTerms(i)+nOscParam(i) : 3+nPolynTerms(i)+nOscParam(i)+nJumps(i)-1), ...
+            transients{i}, ...
+            tauTypes{i}, ...
+            optParams{i}(3+nPolynTerms(i)+nOscParam(i)+nJumps(i) : end), ...
+            optTau{i}, ... % needs FIX !!!!!!!!!
+            optParams{i}(1), optParams{i}(2)...
+            )
+    end
+    fclose(fID); % close log file
+    fprintf('Calculation finished.\nPlotting and writing results (%s)...\n', method)
+    
+    % use parameters in file name
+    resultSaveFile = fullfile(logFileFolder, [stationName, ...
+        sprintf('_itrf%d_KK%d_p%.1f_outl%d', doITRFjump,KK, p, outlFactor), ...
+        '.', method, ...
+        '.csv']); % output: file name of computed trends (csv)
+    
+    % use custom fct
+    resultM = writeResultMatrix(tInterpolV, trenddata, doITRFjump, KK, p, outlFactor, ...
+        [optParams{1}(1), optParams{2}(1), optParams{3}(1)], ...
+        [optParams{1}(2), optParams{2}(2), optParams{3}(2)]);
+    
+    % write matrix to csv file
+    %writematrix(resultM, resultSaveFile, 'Delimiter', 'comma') % R2019a
+    if doSaveResults; csvwrite(resultSaveFile, resultM); end% R2006
+    
+    % Visualize Results
+    % set up title
+    titleString = cell(3, 1); % preallocate
+    for i = 1:3 % E-N-U
+        % set up plot title
+        if isempty(tauTypes{i});tsStr='none'; else; tsStr=sprintf('%s %s', transientType{i,1},transientType{i,2}); end
+        titleString{i} = sprintf('Station:"%s" Transient:%s jump(itrf):%s  jump(eq):%s  RMS=%.2fmm WRMS=%.2fmm (%s)', ...
+            stationName, tsStr,...
+            mat2str(doITRFjump(i)), ...
+            mat2str(doEQjump(i)), ...
+            optParams{i}(1), optParams{i}(2), ... % rms,wrms
+            method); 
+    end
+    
+    % visualize time series and results
+    figTSA = figure;
+    VisualizeTS_Trend_Outliers_ITRF_ENU(...
+        data{:, 'date'}, [data{:, 3}, data{:, 4}, data{:, 5}], outlier_logicals, coordinateName, ...
+        tInterpolV, optTrends, ...
+        titleString, ...
+        currStationJumps{:, 'Date'}, ...
+        [currStationJumps{:, 'Earthquake'}, currStationJumps{:, 'HWSW_Change'}, currStationJumps{:, 'Unknown'}], ...
+        jumpCategoryNames, ...
+        readITRFChanges(itrfChangesTextfile)...
         )
+    % set(gcf, 'InnerPosition', [0 0 604 513]); % small figure
+    set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
+    
+    % visualize residuals
+    figRes = figure;
+    VisualizeResiduals(...
+        data{:, 'date'}, [...
+        data{:, 3}-optTrends(:,1), ... % E residuals
+        data{:, 4}-optTrends(:,2), ... % N residuals
+        data{:, 5}-optTrends(:,3)], ...% U residuals
+        outlier_logicals, ...
+        cellfun(@(x) ['Residual \Delta',x],coordinateName,'UniformOutput',false), ...
+        titleString, ...
+        currStationJumps{:, 'Date'}, ...
+        [currStationJumps{:, 'Earthquake'}, currStationJumps{:, 'HWSW_Change'}, currStationJumps{:, 'Unknown'}], ...
+        jumpCategoryNames, ...
+        readITRFChanges(itrfChangesTextfile)...
+        )
+    % set(gcf, 'InnerPosition', [0 0 604 513]); % small figure
+    set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
+    
+    % PRINT PLOT TREND
+    if doSaveResults % Save figure as image file
+        plot_title = [stationName, '-trend.png'];
+        plot_dir = 'stationTSA_dailyXYZfiles_xyz_plots';
+        saveas(figTSA, fullfile(plot_dir, plot_title));
+    end
+    
+    % PRINT PLOT RESIDUALS
+    if doSaveResults % Save figure as image file
+        plot_title = [stationName, '-residuals.png'];
+        plot_dir = 'stationTSA_dailyXYZfiles_xyz_plots';
+        saveas(figRes, fullfile(plot_dir, plot_title));
+    end
 end
-
-fclose(fID); % close log file
-fprintf('Calculation finished.\nPlotting and writing results ...\n')
-
-% use parameters in file name
-resultSaveFile = fullfile(logFileFolder, [stationName, ...
-    sprintf('_itrf%d_KK%d_p%.1f_outl%d', doITRFjump,KK, p, outlFactor), ...
-    '.csv']); % output: file name of computed trends (csv)
-
-% use custom fct
-resultM = writeResultMatrix(tInterpolV, trenddata, doITRFjump, KK, p, outlFactor, ...
-    [result_parameters{1, 2}{1, 2}, result_parameters{2, 2}{1, 2}, result_parameters{3, 2}{1, 2}], ...
-    [result_parameters{1, 2}{2, 2}, result_parameters{2, 2}{2, 2}, result_parameters{3, 2}{2, 2}]);
-
-% write matrix to csv file
-%writematrix(resultM, resultSaveFile, 'Delimiter', 'comma') % R2019a
-if doSaveResults; csvwrite(resultSaveFile, resultM); end% R2006
-
-%% Visualize Results
-% set up title
-titleString = cell(3, 1); % preallocate
-for i = 1:3 % E-N-U
-    % set up plot title
-    if isempty(tauTypes{i});tsStr='none'; else; tsStr=sprintf('%s %s', transientType{i,1},transientType{i,2}); end
-    titleString{i} = sprintf('Station:"%s" Transient:%s jump(itrf):%s  jump(eq):%s  RMS=%.2fmm WRMS=%.2fmm', ...
-        stationName, tsStr,...
-        mat2str(doITRFjump(i)), ...
-        mat2str(doEQjump(i)), ...
-        result_parameters{i,2}{2,2}, result_parameters{i,2}{2,2}); % rms&wrms
-end
-
-% visualize time series and results
-figTSA = figure;
-VisualizeTS_Trend_Outliers_ITRF_ENU(...
-    data{:, 'date'}, [data{:, 3}, data{:, 4}, data{:, 5}], outlier_logicals, coordinateName, ...
-    tInterpolV, trenddata, ...
-    titleString, ...
-    currStationJumps{:, 'Date'}, ...
-    [currStationJumps{:, 'Earthquake'}, currStationJumps{:, 'HWSW_Change'}, currStationJumps{:, 'Unknown'}], ...
-    jumpCategoryNames, ...
-    readITRFChanges(itrfChangesTextfile)...
-    )
-% set(gcf, 'InnerPosition', [0 0 604 513]); % small figure
-set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
-
-% visualize residuals
-figRes = figure;
-VisualizeResiduals(...
-    data{:, 'date'}, [...
-    data{:, 3}-trenddata(:,1), ... % E residuals
-    data{:, 4}-trenddata(:,2), ... % N residuals
-    data{:, 5}-trenddata(:,3)], ...% U residuals
-    outlier_logicals, ...
-    cellfun(@(x) ['Residual \Delta',x],coordinateName,'UniformOutput',false), ...
-    titleString, ...
-    currStationJumps{:, 'Date'}, ...
-    [currStationJumps{:, 'Earthquake'}, currStationJumps{:, 'HWSW_Change'}, currStationJumps{:, 'Unknown'}], ...
-    jumpCategoryNames, ...
-    readITRFChanges(itrfChangesTextfile)...
-    )
-% set(gcf, 'InnerPosition', [0 0 604 513]); % small figure
-set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
-
-% PRINT PLOT TREND
-if doSaveResults % Save figure as image file
-    plot_title = [stationName, '-trend.png'];
-    plot_dir = 'stationTSA_dailyXYZfiles_xyz_plots';
-    saveas(figTSA, fullfile(plot_dir, plot_title));
-end
-
-% PRINT PLOT RESIDUALS
-if doSaveResults % Save figure as image file
-    plot_title = [stationName, '-residuals.png'];
-    plot_dir = 'stationTSA_dailyXYZfiles_xyz_plots';
-    saveas(figRes, fullfile(plot_dir, plot_title));
-end 
-
 %%
 fprintf('Done!\n')
 % close all
