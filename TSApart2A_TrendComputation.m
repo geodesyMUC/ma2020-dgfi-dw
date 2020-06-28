@@ -179,11 +179,12 @@ dateIntvlN = length(tInterpolV);
 trenddata = [];
 
 % generate tau vector for transients containing all combinations
-tsFctStr = {'log','exp'};
+tsFctStr = {'log','exp'}; % used to verify user input string
 tauCell = cell(3,1);
 tauTypes = cell(3,1);
 for i = 1:3 % E-N-U
     if any(strcmp( transientType{i,1} , tsFctStr )) &&  any(strcmp( transientType{i,2} , tsFctStr ))
+        % Two Transients
         [tauGrid1, tauGrid2] = meshgrid(tauVec1, tauVec2); % create two grids
         tauGrid       = cat(2, tauGrid1, tauGrid2); % cat along 2nd dimension
         tauVec = reshape(tauGrid, [], 2);           % reshape to 2 col vector with rows (tau1, tau2)
@@ -191,21 +192,31 @@ for i = 1:3 % E-N-U
         tauTypes{i} = [ transientType{i,1};transientType{i,2} ];
         tauN(i) = 2;
     elseif any(strcmp( transientType{i,1} , tsFctStr )) && ~any(strcmp( transientType{i,2} , tsFctStr ))
+        % One Transient (tau_short)
         tauTypes{i} = [ transientType{i,1} ];
         tauVec        = tauVec1';
         tauCell{i} = num2cell(tauVec,2);
         tauN(i) = 1;
     elseif ~any(strcmp( transientType{i,1} , tsFctStr )) &&  any(strcmp( transientType{i,2} , tsFctStr ))
+        % One Transient (tau_long)
         tauTypes{i} = [ transientType{i,2} ];
         tauVec        = tauVec2';
         tauCell{i} = num2cell(tauVec,2);
         tauN(i) = 1;
-    else % no match found, no transient to be estimated
+    else
+        % No Transients, no match found
         tauTypes{i} = '';
         tauCell{i} = {[]};
         tauN(i) = 0;
     end
 %     tauCell{i} = tauVec;
+end
+
+% set up transient lookup table
+for i = 1:3 % E-N-U
+    doStopTs = true;
+    tsLUT{i} = getTransientReferences(years(seconds(transients{i})), {transientType{i,:}}, ...
+        [min(tauVec1), min(tauVec2)], [max(tauVec1), max(tauVec2)], doStopTs);
 end
 
 % other variables - get count of params (poly,osc, jumps, transients) per coordinate
