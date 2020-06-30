@@ -55,7 +55,7 @@ for i = 1:length(t_ts)
                 end
             end
             % Append
-            tsT = [tsT; { t_ts(i), types{eqidx,j}, low(eqidx,j), uppNew }];
+            tsT = [tsT; { seconds(years(t_ts(i))), types{eqidx,j}, low(eqidx,j), uppNew }];
         end
     end
 end 

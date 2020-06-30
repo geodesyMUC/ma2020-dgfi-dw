@@ -39,27 +39,8 @@ end
 if doLog; fprintf('n of iterations for IRLS = %d,\np of L_p Norm for IRLS = %.2f,\nOutlier Factor = %d (mean of error + standard deviation * factor < outlier)\n', ...
     KK, p, outl_factor); end
 
-if size(tau,2) ~= size(tsType,1)
-    % try reshaping it (order of elements in tau is important!)
-    % from [tau_1.1, tau_1.2, ... , tau_nEQ.1, tau_nEQ.2] to matrix
-    if size(tau,2)/size(tsType,1) == length(ts_t) % assume ok: -> reshape
-        % possible error: if they match by chance, computation will resume
-        tau = reshape(tau, [length(ts_t), size(tsType,1)]);
-        if size(tsType,1)>1
-            tau = tau'; % so that rows->eq & cols->transients
-        end
-        doLocalTau = true;              % 1 set of tau for each eq (local)
-    else % assume error: dim mismatch -> abandon
-        error('transient error: n of tau per event does not match length of type of tau vector')
-    end
-elseif ~isempty(tau) % assume col count matches, continue row check 
-    if size(tau,1) == 1                 % ok, 1 set of tau for all eq (global)
-        doLocalTau = false;
-    elseif size(tau,1) == length(ts_t)  % ok, 1 set of tau for each eq (local)
-        doLocalTau = true;
-    else                                % error
-        error('transient error: n of tau does not match n of eq events OR is not 1')
-    end
+if length(tau) ~= length(ts_t) || length(ts_t) ~= length(tsType)
+    error('LS error:transient model: length of tau,tau datetime and type of tau vectors do not match')
 end
 
 % convert datetimes from [seconds] to [years]
@@ -73,7 +54,7 @@ nPolynTerms = polynDeg+1; % 0, 1, 2, ...
 nPeriodic = length(W); % oscillations
 nPeriodicCoeff = nPeriodic*2; % cos & sin components (C, S) for every oscillation
 nJumpCoeff = length(j_t); % All Jumps - From DB and ITRF (if set to true)
-nEqParam = length(ts_t)*size(tau,2); % number of amplitudes for transients -> transient * number of eq
+nEqParam = length(ts_t); % number of amplitudes for transients -> transient * number of eq
 
 % Set up Map N: n of Parameter Storage Vector
 N(1) = 0;
@@ -107,40 +88,20 @@ end
 
 % 4:TRANSIENT MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Calculate logarithmic transient for all earthquakes in this TS
-% For every EQ Event, there needs to be (n of Tau) columns
-cnt=1;
 for i = 1:length(ts_t)
     dt = x - ts_t(i);
     dt(dt < 0) = 0; % Every observation BEFORE the event
-    if size(tau,2) > 0
-        if doLocalTau; iEq = i; % local tau
-        else; iEq = 1;          % global tau
-        end
-        
-        % Choose function for Transient 1
-        if strcmp(tsType(1,:),'log')
-            A(:, N(4)+cnt  ) = log( 1 + dt./tau(iEq, 1) ); % logarithmic transient 1
-        elseif strcmp(tsType(1,:),'exp')
-            A(:, N(4)+cnt )  = exp(-dt./tau(iEq, 1));      % exponential transient 1
-        end
-        if size(tau,2) > 1
-            % Choose function for Transient 2
-            if strcmp(tsType(2,:),'log')
-                A(:, N(4)+cnt+1 ) = log( 1 + dt./tau(iEq, 2) ); % logarithmic transient 2
-            elseif strcmp(tsType(2,:),'exp')
-                A(:, N(4)+cnt+1 ) = exp(-dt./tau(iEq, 2));      % exponential transient 2
-            end
-        end
+    if     strcmp(tsType(i),'log')
+        A(:, N(4)+i  ) = log( 1 + dt./tau(i) ); % logarithmic transient
+    elseif strcmp(tsType(i),'exp')
+        A(:, N(4)+i )  = exp( -dt./tau(i) );    % exponential transient
     end
-    cnt=cnt+size(tau,2);
 end
 
 %% (1) Calculate initial parameters xEst from A, b
-
 [xEst, e] = computeLeastSquares(A, b);
 
 %% (2) Detect & Remove outliers
-
 % check if outliers are present
 outlierLogical = abs(e) > mean(e) + std(e) * outl_factor; % Logical with outliers
 
@@ -150,10 +111,10 @@ if nnz(outlierLogical) > 0
     A(outlierLogical, :) = []; % remove them from design matrix A
     % LS one more time
     [xEst, e] = computeLeastSquares(A, b);
-end  
+end
 
-rms = computeRMS(A, b, xEst);
-wrms = computeWRMS(A, b, xEst, eye(length(b))); % weights 1 (diag matrix)
+rms = computeRMS(b - A*xEst);
+wrms = rms;%computeWRMS(b - A*xEst, eye(length(b))); % weights 1 (diag matrix)
 
 %% (3) IRLS - weight optimization
 % to prevent unwanted behaviour when computing trends for TS with multiple
@@ -178,8 +139,8 @@ for k = 1:KK
     pNorm = norm(e, p); % error at each iteration
     E = [E pNorm];
     
-    rms = computeRMS(A, b, xEst);
-    wrms = computeWRMS(A, b, xEst, w); % weights 1 (diag matrix)
+    rms = computeRMS(b - A*xEst);
+    wrms = rms;%computeWRMS(b - A*xEst, w); % weights 1 (diag matrix)
     
     RMS_vector = [RMS_vector rms]; % append
     WRMS_vector = [WRMS_vector wrms]; % append
@@ -295,13 +256,13 @@ e = A * xEst - b; % Error vector
 
 end
 
-function [rms] = computeRMS(A, b, xEst)
-nData = length(b); % number of observations
-rms = sqrt(1/nData * sum((b - A * xEst).^2)); % root mean square
+function [rms] = computeRMS(e)
+nData = length(e); % number of observations
+rms = sqrt(1/nData * sum((e).^2)); % root mean square
 end
 
-function [wrms] = computeWRMS(A, b, xEst, w_i)
-wrms = sqrt(sum(w_i .* (b - A * xEst).^2)/sum(w_i)); % weighted root mean square
+function [wrms] = computeWRMS(e, w_i)
+wrms = sqrt(sum(w_i .* e.^2)/sum(w_i)); % weighted root mean square
 end
 
 function x = lsqInvMMult(A, B)
