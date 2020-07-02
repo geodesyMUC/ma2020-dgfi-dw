@@ -1,17 +1,17 @@
 function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor)
 % IRLSE - Iterative Reweighted (Linear) Least Squares
 % INPUT
-%   x: vector containing time stamps in [SECONDS] relative to t0
+%   x: vector containing time stamps in [YEARS] relative to t0
 %   b: vector containing observations
 %   polynDeg: integer power of polynome denoting station velocity
 %   w: vector containing periods in [RAD]
-%   j_t: vector containing jump times in [SECONDS] relative to t0 (if not specified -> empty)
-%   ts_t: vector containing transient times for earthquakes in [SECONDS] relative to t0 (if not specified -> empty)
+%   j_t: vector containing jump times in [YEARS] relative to t0 (if not specified -> empty)
+%   ts_t: vector containing transient times for earthquakes in [YEARS] relative to t0 (if not specified -> empty)
 %   (Note: t0 refers to the datetime of the first observation in the time series)
 %   T: Logarithmic Transient Parameter in [YEARS], will be set to 1 if not specified
 %   KK: number of iterations for IRLS
 %   p: L_p Norm for IRLS. p=2 equals to the euclidean norm (=L2). 
-%   If p=2, no reweighting will be applied, independent of the number of iterations KK
+%   If p=2, no reweighting will be applied, independently from the number of iterations KK
 %   outl_factor: median(error)|mean(error) + standard deviation * factor -> outlier
 doLog = false;
 
@@ -42,11 +42,6 @@ if doLog; fprintf('n of iterations for IRLS = %d,\np of L_p Norm for IRLS = %.2f
 if length(tau) ~= length(ts_t) || length(ts_t) ~= length(tsType)
     error('LS error:transient model: length of tau,tau datetime and type of tau vectors do not match')
 end
-
-% convert datetimes from [seconds] to [years]
-x = years(seconds(x));       % x./(365.25 * 86400);
-j_t = years(seconds(j_t));      % jt./(365.25 * 86400);
-ts_t = years(seconds(ts_t));    % eqjt./(365.25 * 86400);
 
 % parameter counts
 nData = length(x); % number of observations
@@ -113,8 +108,8 @@ if nnz(outlierLogical) > 0
     [xEst, e] = computeLeastSquares(A, b);
 end
 
-rms = computeRMS(b - A*xEst);
-wrms = rms;%computeWRMS(b - A*xEst, eye(length(b))); % weights 1 (diag matrix)
+rms  = computeRMS(b - A*xEst);
+wrms = computeWRMS(b - A*xEst, eye(length(b))); % weights 1 (diag matrix)
 
 %% (3) IRLS - weight optimization
 % to prevent unwanted behaviour when computing trends for TS with multiple
@@ -262,7 +257,7 @@ rms = sqrt(1/nData * sum((e).^2)); % root mean square
 end
 
 function [wrms] = computeWRMS(e, w_i)
-wrms = sqrt(sum(w_i .* e.^2)/sum(w_i)); % weighted root mean square
+wrms = sqrt( diag(w_i)'*e.^2 / sum( diag(w_i) ) ); % weighted root mean square
 end
 
 function x = lsqInvMMult(A, B)

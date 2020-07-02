@@ -15,38 +15,38 @@ if size(x, 1) > size(x, 2) % fix row/col
     x = x';
 end
 
-pol_N = length(pol); % number of polynomial coeffiecients
-w_N = length(w); % number of periodic coefficients
-jump_N = length(jt); % number of shifts
-ts_N = length(ts_t); % number of transients
+nPoly = length(pol); % number of polynomial coeffiecients
+nW = length(w); % number of periodic coefficients
+nJump = length(jt); % number of shifts
+nTs = length(ts_t); % number of transients
 
-if length(tau) ~= length(ts_t) || length(ts_t) ~= length(tsType)
-    error('LS error:transient model: length of tau,tau datetime and type of tau vectors do not match')
+if length(tau) ~= nTs || nTs ~= length(tsType)
+    error('Time Function:transient model mismatch: vector length of tau,tau datetime and type of tau')
 end
 
-yy = zeros(size(x, 2), pol_N + w_N + jump_N + ts_N);
+yy = zeros(size(x, 2), nPoly + nW + nJump + nTs);
 
 cnt = 1; % counter variable for incremenation
 % polynom terms
-for i = 0:pol_N - 1
+for i = 0:nPoly - 1
     yy(:, cnt) = pol(i + 1) * x.^(i);
     cnt = cnt + 1;
 end
 
 % periodic terms
-for i = 1:w_N
+for i = 1:nW
     yy(:, cnt) = CS(1, i) * cos(x * w(i)) + CS(2, i) * sin(x * w(i));
     cnt = cnt + 1;
 end
 
 % jump terms
-for i = 1:jump_N
+for i = 1:nJump
     yy(:, cnt) = b(i) * heaviside(x - jt(i));
     cnt = cnt + 1;
 end
 
 % transient terms
-for i = 1:ts_N
+for i = 1:nTs
     dt = x - ts_t(i); % num coeff!=num eq events
     dt(dt < 0) = 0; % Every observation BEFORE the eq event
     if strcmp(tsType(i),'log')

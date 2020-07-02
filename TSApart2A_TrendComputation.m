@@ -34,6 +34,7 @@ inputFolder = 'station_data_dailyXYZfiles'; % Where Station Data (TSA_ReadAndTra
 jumpCSVLocation = 'src/jumps_dailyXYZfiles.csv'; % Location of Jump Table/Jump Database
 itrfChangesTextfile = 'src/itrf_changes.txt';
 doSaveResults = false; % save pngs and result files
+doStaticFile = true;
 %%% Name of station to be analysed %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SELECTION FOR ANALYSIS
 
@@ -64,6 +65,8 @@ osc = {[], [], []};     % common values: 0.5y, 1y
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
 doITRFjump  = [false false false]; % E-N-U
 doEQjump    = [true true true]; % E-N-U
+doStopTs = true; % global
+
 % specify type of transient: "log","exp","nil"
 transientType = {...
     'log','log'; ...    % coordinate1:E|X
@@ -72,10 +75,14 @@ transientType = {...
 
 % Parameter tau in [years] for computation of logarithmic transient for
 % earthquake events (jumps):
-% vector mapping different T (tau) relaxation coefficients
+% vector mapping different T (tau) relaxation coefficients [years]
 tauVec1 = years(days(1:20:200));
 tauVec2 = years(days(250:40:730));
 % tauVec1 = years(days(1:5:365)); % full range tau
+
+% optimization constraints for transient 1 and transient 2
+lowLimit = [min(tauVec1), min(tauVec2)];
+uppLimit = [max(tauVec1), max(tauVec2)];
 
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
 KK = 0;             % n of iterations for IRLS
@@ -132,60 +139,77 @@ VisualizeTS_ENU2(data, dataStation, currStationJumps{:, 2}, ...
     'jumpTypes', currStationJumps{:, 4:5});
 
 %% Prepare Data for LS Estimation
-t  = data{:, 't'}; % [seconds]; for years, do /(365.25 * 86400);
-t  = t-t(1); % adjust for negative t values
-t0 = data{1, 'date'}; % beginning of ts as datetime
-% convert oscillations to angular velocity
+% Convert Oscillation Periods to Angular Velocity
 oscW = cellfun(@(x) 2*pi./x, osc, 'UniformOutput', false);
 
-% preallocate
-heavJumps  = cell(3,1); % Heaviside Jumps for the 3 coordinates E,N,U
-transients = cell(3,1); % Transients for the 3 coordinates E,N,U 
+% Time Series Timestamps
+t  = data{:, 't'};       % timestamps [seconds];
+t = years( seconds(t) ); % convert timestamps to [years]
+t  = t-t(1);             % adjust for negative t values
+t0 = data{1, 'date'};    % timestamp [datetime] of first measurement
 
-% load tables
+% Set up variables for relative date of jumps and transients
 % Distinguish between EQs (invokes transient) and other jumps (do not invoke transient)
-eqLogical = logical(currStationJumps{:, 4}); % 1:=earthquake; 0:=no earthquake
+isEq = logical(currStationJumps{:, 4}); % 1:=earthquake; 0:=no earthquake
 jumps0itrf = getRelativeITRFJumps(t0, itrfChangesTextfile);
 
-% assign tables
+% Preallocate Storages
+heavJumps  = cell(3,1); % Heaviside Jumps for the 3 coordinates E,N,U
+transients = cell(3,1); % Transients for the 3 coordinates E,N,U
 for i = 1:3 % E-N-U
-    % Get Earthquake Transient Vector - Those Jumps will invoke a transient
-    transients{i} = getRelativeJumps_eq(currStationJumps{:, 2}, t0, eqLogical);
+    % Get Transient Datetime from jumps where type = eq
+    ts_t = getRelativeJumps_eq(currStationJumps{:, 2}, t0, isEq);
     fprintf('[%s]: doEQjump set to "%s"\n', coordinateName{i}(1), mat2str(doEQjump(i)));
-    if doEQjump(i) % all jumps
-        heavJumps{i} = getRelativeJumps(currStationJumps{:, 2}, t0);
-    else % jumps w/o eq
-        heavJumps{i} = getRelativeJumps_eq(currStationJumps{:, 2}, t0, ~eqLogical);
+    if doEQjump(i) 
+        % all jump types
+        jumps = getRelativeJumps(currStationJumps{:, 'Date'}, t0);
+    else
+        % only jump types which are NOT eq
+        jumps = getRelativeJumps_eq(currStationJumps{:, 2}, t0, ~isEq);
     end
+    
     % Add ITRF Realization Change Jumps
     fprintf('[%s]: doITRFjumps set to "%s"\n', coordinateName{i}(1), mat2str(doITRFjump(i)));
     if doITRFjump(i)
         % append itrf jumps to heaviside jumps vector
-        heavJumps{i} = [heavJumps{i}; jumps0itrf];
+        jumps = [jumps; jumps0itrf];
     end
+    
+    % Convert to [years] & assign to cell array 
+    transients{i} = years( ts_t );
+    heavJumps{i}  = years( jumps );
+    % Lookup Table for relative transient timestamps, types and limits (->optimization)
+    tsLUT{i} = getTransientReferences(transients{i}, transientType(i,:), ...
+        lowLimit, uppLimit, doStopTs);
 end
 
-% preallocate cell arrays for output
+% create datetime array with equal date intervals (1d)
+tInterpol =  data{:, 'date'}; % take original timestamps, no interpolation
+% tInterpol =  min(data{:, 'date'}):days(1):max(data{:, 'date'}); % 1d interpolation
+dateIntvlN = length(tInterpol); % n of timestamps
+
+
+% preallocate output storages
+resStor = cell(1,3); % E-N-U
+nMethod = 3; % gs,dhs,ip
+fields = {'optp', 'xmin', 'model', 'trend', 'error', 'outl'};
+vals = {cell(1,nMethod), cell(1,nMethod), cell(1,nMethod), cell(1,nMethod), cell(1,nMethod), cell(1,nMethod)};
+for i = 1:3 % E-N-U
+    resStor{i} = struct(...
+        fields{1},vals{1}, ...
+        fields{2},vals{2}, ...
+        fields{3},vals{3}, ...
+        fields{4},vals{4}, ...
+        fields{5},vals{5}, ...
+        fields{6},vals{6} ...
+        );
+end
+
 result_parameters = cell(3, 2);
 outlier_logicals  = cell(3, 1);
 outlier_logicals  = cellfun(@(x) zeros(length(t), 1), outlier_logicals, 'UniformOutput', false); % workaround for no outliers
 
-% create datetime array with equal date intervals (1d)
-tInterpolV =  data{:, 'date'}; % verify integrity of algorithm COMMENT
-% dateIntvl =  min(data{:, 'date'}):days(1):max(data{:, 'date'}); %
-% n of intervals (ie days)
-dateIntvlN = length(tInterpolV);
-% trenddata = zeros(dateIntvlN, 3); % preallocate trend data array
-trenddata = [];
-
-% set up transient lookup table
-for i = 1:3 % E-N-U
-    doStopTs = true;
-    tsLUT{i} = getTransientReferences(years(seconds(transients{i})), {transientType{i,:}}, ...
-        [min(tauVec1), min(tauVec2)], [max(tauVec1), max(tauVec2)], doStopTs);
-end
-
-% generate tau vector for transients containing all combinations
+% generate tau vector for transients containing all combinations of values
 tsFctStr = {'log','exp'}; % used to verify user input string
 tauCell = cell(3,1);
 tauTypes = cell(3,1);
@@ -231,71 +255,73 @@ end
 
 % prepare array to store results rms,wrms,est.params FOR EVERY COMBINATION
 % OF TAU (rows) and E,N,U (cols)
-resultCell = cell(3,1);
+fxResAll = cell(3,1);
 for i = 1:3 % E-N-U
-    resultCell{i} = zeros(size(tauCell{i},1), 2+nPolynTerms(i)+nOscParam(i)+nJumps(i)+nTransients(i) );
+    fxResAll{i} = zeros( size(tauCell{i},1) , 1 );
 end
 
 %% Parameter Estimation (Grid Search)
-params.t        = t;                    % t in years where t0=beginning of TS
+params.t        = t;                    % timestamps [years], must be sorted
 params.kk       = KK;                   % n of iterations for IRLS
 params.p        = p;                    % L_p Norm for IRLS
 params.outl     = outlFactor;           % median(error) + standard deviation * factor -> outlier
-for j = 1:3 % E-N-U    
-    params.b        = data{:,j+2};      % vector with metric (coordinate)
-    params.poly     = polynDeg(j);      % polynome degree
-    params.w        = oscW{j};          % periods
-    params.jt       = heavJumps{j};     % jumps: time in years relative to t0
-    params.tst      = repelem(transients{j}', nTau(j));    % eq transients: time in years since t0 
-    params.tstype   = repmat(tauTypes{j},   [1,nEq(j)]);  % type (function) of tau (log|exp)
+for i = 1:3 % E-N-U
+    params.b        = data{:,i+2};      % vector with metric (coordinate)
+    params.poly     = polynDeg(i);      % integer polynome degree
+    params.w        = oscW{i};          % periods [angular velocity]
+    params.jt       = heavJumps{i};     % jump timestamps [years] relative to t0
     
-    for i = 1:length(tauCell{j})
-        params.tau      = repmat(tauCell{j}{i}, [1,nEq(j)]); % transient parameter tau 
+    % The following parameters need to be repeated for each transient or eq
+    % to satisfy LS Input req.
+    params.tst      = ...
+        repelem( transients{i}' , nTau(i) );     % eq transients: time in years since t0
+    params.tstype   = ...
+        repmat( tauTypes{i} , [1,nEq(i)] );      % type (function) of tau (log|exp)
+    
+    fxRes = zeros( size(tauCell{i},1) , 1 ); % preallocate
+    
+    % tau value combination loop (grid search)
+    for j = 1:length(tauCell{i})
+        params.tau = ...
+            repmat( tauCell{i}{j} , [1,nEq(i)] ); % transient parameter tau
         
-        fprintf('Evaluating "%s" ...\n', coordinateName{j}); 
+        fprintf('LS for "%s" (%d of %d), tau=[%s\b] ...\n', ...
+            coordinateName{i}, j, length(tauCell{i}), ...
+            sprintf('%.4f ', tauCell{i}{j} ));
         
-        [y, result_parameterC, xEst, ~] = computeTrendIRLS( params ); % LS
-        
-        % results: [RMS,WRMS,Params]
-        resultCell{j}(i,:) = [result_parameterC{1,2}, result_parameterC{2,2}, xEst'];
+        [~, result_parameterC, ~, ~] = computeTrendIRLS( params ); % LS
+        fxRes(j) = result_parameterC{1,2};       % 1=RMS, 2=WRMS
+        fxResAll{i}(j) = result_parameterC{1,2}; % 1=RMS, 2=WRMS, for map plot
     end
-end
-
-% get best solution: min RMS (idx)
-[~, EMinIdx]    = min( resultCell{1}(:,1) );
-[~, NMinIdx]    = min( resultCell{2}(:,1) );
-[~, UMinIdx]    = min( resultCell{3}(:,1) );
-if length(tauCell{1})==length(tauCell{2})
-    [~, ENMinIdx]   = min(sum( [resultCell{1}(:,1), resultCell{2}(:,1)],2));
-    if length(tauCell{1})==length(tauCell{2}) &&  ...
-            length(tauCell{1})==length(tauCell{3})
-        [~, TotalMinIdx]= min(sum( [resultCell{1}(:,1), resultCell{2}(:,1), resultCell{3}(:,1)] ,2));
-    end
-end
-BestIdx = [EMinIdx NMinIdx UMinIdx]; % can be adapted
-
-% compute time series based on found solution for ENU
-for i = 1:3 % E-N-U
-    oscCS = resultCell{i}(BestIdx(i), 3+nPolynTerms(i) : 3+nPolynTerms(i)+nOscParam(i)-1);
-    oscCS = [oscCS(1:2:end); oscCS(2:2:end)]; % reorder cosine/sine components
-    trenddata(:, i) = TimeFunction(years(seconds(t)), ...
-        resultCell{i}(BestIdx(i), 3 : 3+nPolynTerms(i)-1 ), ...
-        oscCS, ... % rearranged oscillation amplitudes (cosine, sine)
-        osc{i}, ... % periods
-        years(seconds(heavJumps{i})), ...
-        resultCell{i}(BestIdx(i), 3+nPolynTerms(i)+nOscParam(i) : 3+nPolynTerms(i)+nOscParam(i)+nJumps(i)-1), ...
-        years(seconds( repelem(transients{i}', nTau(i)) )), ...
-        resultCell{i}(BestIdx(i), 3+nPolynTerms(i)+nOscParam(i)+nJumps(i) : end), ...
-        repmat(tauCell{i}{BestIdx(i)}, [1,nEq(i)]), ...
-        repmat(tauTypes{i}, [1,nEq(i)])...
+    [~, minIdx] = min( fxRes ); % minimization min( f(x) )
+    minIdx = minIdx(1);         % prevent duplicates
+    
+    params.tau = repmat( tauCell{i}{minIdx} , [1,nEq(i)] );       % optimum tau
+    [~, result_parameterC, xEst, ~] = computeTrendIRLS( params ); % LS: get parameters
+    
+    optP = getParamStruct([result_parameterC{1,2}, result_parameterC{2,2}, xEst'],...
+        2, nPolynTerms(i), nOscParam(i), nJumps(i), nTransients(i));
+    
+    trenddata = TimeFunction(... % calculate points
+        t, ...
+        optP.polyn, ...
+        reorderSinCos( optP.oscil ), ... % rearranged oscillation amplitudes (cosine, sine)
+        osc{i}, ...                      % periods
+        heavJumps{i}, ...
+        optP.jumps, ...
+        repelem( transients{i}' , nTau(i) ), ...
+        optP.tsamp, ...
+        repmat( tauCell{i}{minIdx} , [1,nEq(i)] ), ...
+        repmat( tauTypes{i} , [1,nEq(i)] )...
         );
-end
-
-% save results: GRID SEARCH
-for i = 1:3 % E-N-U
-    result_parameters{i, 1} = coordinateName{i};
-    result_parameters{i, 2} = ...
-        {'rms', resultCell{i}(BestIdx(i),1); 'wrms', resultCell{i}(BestIdx(i),2)}; % assign parameter cell to super cell
+    e = {'rms', optP.error(1); 'wrms', optP.error(2)};
+    
+    resStor{i}(1).trend = trenddata;
+    resStor{i}(1).error = e;
+    resStor{i}(1).optp  = optP;
+    resStor{i}(1).xmin  = repmat( tauCell{i}{minIdx} , [1,nEq(i)] );
+    resStor{i}(1).model = params;
+    
 end
 
 %% Mapping&Parameter Optimization (DHS/IP)
@@ -310,12 +336,6 @@ for i = 1:3 % E-N-U
 end
 
 % create map plot for tau & optimization
-minRes = cell(3,1);
-for i = 1:3 % E-N-U
-    minRes{i} = zeros(1, 2+nPolynTerms(i)+nOscParam(i)+nJumps(i)+nTransients(i) );
-end
-minRes_ = minRes;
-
 for i = 1:3 % E-N-U
     if size(tauCell{i}{1},2) == 1 % 1 tau
         figure
@@ -324,30 +344,45 @@ for i = 1:3 % E-N-U
         ylabel('rms [mm]')
         title(["\tau parameter space for ", coordinateName{i}])
     elseif size(tauCell{i}{1},2) == 2 && length(tauVec1)>1 && length(tauVec2)>1  % 2 tau
-        resultGrid = reshape(resultCell{i}(:,1), length(tauVec2), length(tauVec1) );
+        resultGrid = reshape(fxResAll{i}(:,1), length(tauVec2), length(tauVec1) );
         figure
         colormap(flipud(parula)) % low error = good
-%         contourf(days(years(tauVec1)),days(years(tauVec2)),resultGrid);
+        % contourf(days(years(tauVec1)),days(years(tauVec2)),resultGrid);
         contourf(tauVec1,tauVec2,resultGrid);
-        xlabel('\tau_{log1}SHORT [days]')
-        ylabel('\tau_{log2}LONG [days]')
+        xlabel('\tau_{log1}SHORT [y]')
+        ylabel('\tau_{log2}LONG [y]')
         title(["\tau parameter space for ", coordinateName{i}])
         c = colorbar;
-        c.Label.String = 'RMS';
+        c.Label.String = 'RMS[mm]';
         xlim([min(tauVec1) , max(tauVec1)])
         ylim([min(tauVec2) , max(tauVec2)])
         hold off
     end
     
-    % optimization
+    % function to calculate points
+    timeFn = @(a, b, c, d, e) TimeFunction(...
+        t, ...
+        a, ...                  % polynome term coefficients
+        reorderSinCos( b ), ... % rearranged oscillation amplitudes (cosine, sine)
+        osc{i}, ...             
+        heavJumps{i}, ...
+        c, ...                  % heaviside jumps
+        tsLUT{i}{:,'time'}, ...
+        d, ...                  % amplitudes
+        e,...                   % tau
+        tsLUT{i}{:,'type'}...
+        );
+    
+    % optimization default parameters
     params.b        = data{:,i+2};  % vector with metric (coordinate)
     params.poly     = polynDeg(i);  % polynome degree
     params.w        = oscW{i};      % periods
     params.jt       = heavJumps{i}; % jumps: time in years relative to t0
-    params.tst      = tsLUT{i}{:,'time'}';% eq transients: time in years since t0 
+    params.tst      = tsLUT{i}{:,'time'}';% eq transients: time in years since t0
     params.tstype   = tsLUT{i}{:,'type'}';  % type (function) of tau (log|exp)
     
-    optFun = @(x) getTrendError(... % anonymous fct
+    % function for optimization
+    optFun = @(x) getTrendError(...
         params.t, ...     % t in years where t0=beginning of TS
         params.b, ...     % vector with metric (coordinate)
         params.poly, ...  % polynome degree
@@ -361,123 +396,75 @@ for i = 1:3 % E-N-U
         params.outl...    % median(error) + standard deviation * factor -> outlier );
         );
     
-    % DHS (custom method)
-    [xMin{i},fxMin(i),nFnCalls(i),nRestarts(i),~] = ...
-        dhscopt(optFun, x0{i}', steps{i}', lLim{i}', uLim{i}', tol, restartScale, false);
-    % function call to estimate best parameters
-    params.tau = xMin{i};% transient parameter tau
-    [~, result_parameterC, xEst, ~] = computeTrendIRLS( params );
-    % results: [RMS,WRMS,Params]
-    minRes{i} = [result_parameterC{1,2}, result_parameterC{2,2}, xEst'];
-    
-    % MATLAB method
-    if ~isempty(x0{i})
-        options = optimoptions(@fmincon,...
-            'Display','iter','Algorithm','interior-point');
-        [xMin_{i},fxMin_{i}] = fmincon(optFun,x0{i},...
-            [],[],[],[],lLim{i},uLim{i},[],options);
-    else
-        xMin_{i} = [];
+    for j = 2:3 % dhs-ip
+        if j == 2
+            % DHS (custom method)
+            [xMin, fxMin(i),nFnCalls(i),nRestarts(i),~] = ...
+                dhscopt(optFun, x0{i}', steps{i}', lLim{i}', uLim{i}', tol, restartScale, false);
+        elseif j == 3
+            % MATLAB method
+            if ~isempty(x0{i})
+                options = optimoptions(@fmincon,...
+                    'Display','iter','Algorithm','interior-point');
+                [xMin,fxMin_{i}] = fmincon(optFun,x0{i},...
+                    [],[],[],[],lLim{i},uLim{i},[],options);
+            else
+                xMin = [];
+            end
+        end
+        
+        params.tau = xMin; % set transient parameters tau
+        [~, result_parameterC, xEst, ~] = computeTrendIRLS( params ); % get parameters
+        optP = getParamStruct([result_parameterC{1,2}, result_parameterC{2,2}, xEst'], ...
+            2, nPolynTerms(i), nOscParam(i), nJumps(i), length(xMin));
+        optY = timeFn(...
+            optP.polyn, ...
+            optP.oscil, ...
+            optP.jumps, ...
+            optP.tsamp, ...
+            xMin);
+        e = {'rms', optP.error(1); 'wrms', optP.error(2)};
+        % store in result struct
+        resStor{i}(j).optp = optP;
+        resStor{i}(j).error = e;
+        resStor{i}(j).trend = optY;
+        resStor{i}(j).xmin = xMin;
+        resStor{i}(j).model = params;
     end
-    % function call to estimate best parameters
-    params.tau = xMin_{i};% transient parameter tau
-    [~, result_parameterC, xEst, ~] = computeTrendIRLS( params );
-    % results: [RMS,WRMS,Params]
-    minRes_{i} = [result_parameterC{1,2}, result_parameterC{2,2}, xEst'];
-end
-
-% compute time series based on optimized solution for ENU
-minTrend = [];
-minTrend_ = [];
-for i = 1:3 % E-N-U
-    oscCS = minRes{i}(3+nPolynTerms(i) : 3+nPolynTerms(i)+nOscParam(i)-1);
-    oscCS = [oscCS(1:2:end); oscCS(2:2:end)]; % reorder cosine/sine components
-    % dhs
-    minTrend(:, i) = TimeFunction(years(seconds(t)), ...
-        minRes{i}( 3 : 3+nPolynTerms(i)-1 ), ...
-        oscCS, ...      % rearranged oscillation amplitudes (cosine, sine)
-        osc{i}, ...     % periods
-        years(seconds(heavJumps{i})), ...
-        minRes{i}(3+nPolynTerms(i)+nOscParam(i) : 3+nPolynTerms(i)+nOscParam(i)+nJumps(i)-1), ...
-        years(seconds(tsLUT{i}{:,'time'})), ...
-        minRes{i}(3+nPolynTerms(i)+nOscParam(i)+nJumps(i) : end), ...
-        xMin{i},...     % opt for tau
-        tsLUT{i}{:,'type'}...
-        );
-    % ip
-    minTrend_(:, i) = TimeFunction(years(seconds(t)), ...
-        minRes{i}( 3 : 3+nPolynTerms(i)-1 ), ...
-        oscCS, ...      % rearranged oscillation amplitudes (cosine, sine)
-        osc{i}, ...     % periods
-        years(seconds(heavJumps{i})), ...
-        minRes{i}(3+nPolynTerms(i)+nOscParam(i) : 3+nPolynTerms(i)+nOscParam(i)+nJumps(i)-1), ...
-        years(seconds(tsLUT{i}{:,'time'})), ...
-        minRes{i}(3+nPolynTerms(i)+nOscParam(i)+nJumps(i) : end), ...
-        xMin{i},...     % opt for tau
-        tsLUT{i}{:,'type'}...
-        );
-end
-
-% save results: OPTIMIZATION
-minError = cell(3, 2);
-minError_ = cell(3, 2);
-for i = 1:3 % E-N-U
-    % dhs
-    minError{i, 1} = coordinateName{i};
-    minError{i, 2} = ...
-        {'rms', minRes{i}(1); 'wrms', minRes{i}(2)}; % assign parameter cell to super cell
-    % ip
-    minError_{i, 1} = coordinateName{i};
-    minError_{i, 2} = ...
-        {'rms', minRes{i}(1); 'wrms', minRes{i}(2)}; % assign parameter cell to super cell
 end
 
 %% Evaluation
-currTime = datestr(datetime('now'),'yyyy-mm-dd_HH-MM-SS');
+if ~doStaticFile
+    currTime = [datestr(datetime('now'),'yyyy-mm-dd_HH-MM-SS'), '.'];
+else
+    currTime = '';
+end
+
 for j = 1:3 % grid search-dhs-ip
     if j == 1
         method = 'gs';
-        optTrends = trenddata;
-        for i = 1:3 % E-N-U
-            optParams{i} = resultCell{i}(BestIdx(i),:);
-            optTau{i} = repmat(tauCell{i}{BestIdx(i)}, [1,nEq(i)]);
-            optTsT{i} = repelem(transients{i}', nEq(i));
-        end
     elseif j == 2
         method = 'dhs';
-        optParams = minRes;
-        optTrends = minTrend;
-        optTau = xMin;
-        for i = 1:3 % E-N-U
-            optTsT{i} = tsLUT{i}{:,'time'};
-        end
     elseif j == 3
         method = 'ip';
-        optParams = minRes_;
-        optTrends = minTrend_;
-        optTau = xMin_;
-        for i = 1:3 % E-N-U
-            optTsT{i} = tsLUT{i}{:,'time'};
-        end
-        
     end
     % Write to File
     % Open Log File and get identifier
-    logFile = [stationName,'.', currTime,'.',method,'.log']; % output: log file name
+    logFile = [stationName,'.', currTime, method,'.log']; % output: log file name
     fID = fopen(fullfile(logFileFolder, logFile), 'wt');
     for i = 1:3 % E-N-U
-        writeInputLog(fID, stationName, coordinateName{i}, data{:, 'date'}, ...
-            polynDeg(i), osc{i}, heavJumps{i}, ...
-            transients{i}, cell2mat(tauCell{i}), tauTypes{i}, ...
-            KK, p, outlFactor);
+%         writeInputLog(fID, stationName, coordinateName{i}, data{:, 'date'}, ...
+%             polynDeg(i), osc{i}, heavJumps{i}, ...
+%             resStor{i}(j).model.tst, resStor{i}(j).model.tau, resStor{1}(1).model.tstype, ...
+%             KK, p, outlFactor);
         writeOutputLog(fID, dataStation, coordinateName{i}, ...
-            optParams{i}(3 : 3+nPolynTerms(i)-1 ), ...
-            oscCS, ...
-            optParams{i}(3+nPolynTerms(i)+nOscParam(i) : 3+nPolynTerms(i)+nOscParam(i)+nJumps(i)-1), ...
-            optTsT{i}, ...
-            optParams{i}(3+nPolynTerms(i)+nOscParam(i)+nJumps(i) : end), ...
-            optTau{i}, ... % needs FIX !!!!!!!!!
-            optParams{i}(1), optParams{i}(2)...
+            resStor{i}(j).optp.polyn, ...
+            reorderSinCos( resStor{i}(j).optp.oscil ), ...
+            resStor{i}(j).optp.jumps, ...
+            resStor{i}(j).model.tst, ...
+            resStor{i}(j).optp.tsamp, ...
+            resStor{i}(j).model.tau, ... 
+            resStor{i}(j).error{1,2}, resStor{i}(j).error{2,2}...
             )
     end
     fclose(fID); % close log file
@@ -490,9 +477,9 @@ for j = 1:3 % grid search-dhs-ip
         '.csv']); % output: file name of computed trends (csv)
     
     % use custom fct
-    resultM = writeResultMatrix(tInterpolV, trenddata, doITRFjump, KK, p, outlFactor, ...
-        [optParams{1}(1), optParams{2}(1), optParams{3}(1)], ...
-        [optParams{1}(2), optParams{2}(2), optParams{3}(2)]);
+%     resultM = writeResultMatrix(tInterpol, trenddata, doITRFjump, KK, p, outlFactor, ...
+%         [optParams{1}(1), optParams{2}(1), optParams{3}(1)], ...
+%         [optParams{1}(2), optParams{2}(2), optParams{3}(2)]);
     
     % write matrix to csv file
     %writematrix(resultM, resultSaveFile, 'Delimiter', 'comma') % R2019a
@@ -508,7 +495,7 @@ for j = 1:3 % grid search-dhs-ip
             stationName, tsStr,...
             mat2str(doITRFjump(i)), ...
             mat2str(doEQjump(i)), ...
-            optParams{i}(1), optParams{i}(2), ... % rms,wrms
+            resStor{i}(j).error{1,2}, resStor{i}(j).error{2,2}, ... % rms,wrms
             method); 
     end
     
@@ -516,7 +503,7 @@ for j = 1:3 % grid search-dhs-ip
     figTSA = figure;
     VisualizeTS_Trend_Outliers_ITRF_ENU(...
         data{:, 'date'}, [data{:, 3}, data{:, 4}, data{:, 5}], outlier_logicals, coordinateName, ...
-        tInterpolV, optTrends, ...
+        tInterpol, [resStor{1}(j).trend, resStor{2}(j).trend, resStor{3}(j).trend], ...
         titleString, ...
         currStationJumps{:, 'Date'}, ...
         [currStationJumps{:, 'Earthquake'}, currStationJumps{:, 'HWSW_Change'}, currStationJumps{:, 'Unknown'}], ...
@@ -530,9 +517,9 @@ for j = 1:3 % grid search-dhs-ip
     figRes = figure;
     VisualizeResiduals(...
         data{:, 'date'}, [...
-        data{:, 3}-optTrends(:,1), ... % E residuals
-        data{:, 4}-optTrends(:,2), ... % N residuals
-        data{:, 5}-optTrends(:,3)], ...% U residuals
+        data{:, 3}-resStor{1}(j).trend, ... % E residuals
+        data{:, 4}-resStor{2}(j).trend, ... % N residuals
+        data{:, 5}-resStor{3}(j).trend], ...% U residuals
         outlier_logicals, ...
         cellfun(@(x) ['Residual \Delta',x],coordinateName,'UniformOutput',false), ...
         titleString, ...
@@ -561,6 +548,31 @@ end
 %%
 fprintf('Done!\n')
 % close all
+
+function res = getParamStruct(params, os, nPoly, nOsci, nJump, nTran)
+%gets result from parameter vector and writes them to struct.
+s(1) = os+1;
+s(2) = s(1)+nPoly;
+s(3) = s(2)+nOsci;
+s(4) = s(3)+nJump;
+s(5) = s(4)+nTran;
+
+res.error =  params( 1    : s(1)-1 );
+res.polyn =  params( s(1) : s(2)-1 );
+res.oscil =  params( s(2) : s(3)-1 );
+res.jumps =  params( s(3) : s(4)-1 );
+res.tsamp =  params( s(4) : s(5)-1 );
+end
+
+function res = reorderSinCos(osc)
+%reorders sine/cosine oscillation components
+% input: oscillation components as vector
+% (number of coefficients must be even)
+if mod(osc,2) == 1
+    error('reorderSinCos: input error: oscillation component vector must contain even number of elements')
+end
+res = [osc(1:2:end); osc(2:2:end)];
+end
 
 function out = getTrendError(x, b, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor)
 [~,results,~,~] = computeTrendIRLS(x, b, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor);
