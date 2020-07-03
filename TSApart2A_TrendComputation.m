@@ -52,9 +52,9 @@ doStaticFile = true;
 % stationName = '21701S007A03'; % KSMV %[ok]
 % stationName = '21702M002A07'; % MIZU %[ok]
 % stationName = '21729S007A04'; % USUDA %[ok]
-% stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
+stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
-stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
+% stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
 % stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
 % stationName = '41719M004A02'; % Concepcion %[ok]
 
@@ -66,7 +66,7 @@ osc = {[], [], []};     % common values: 0.5y, 1y
 doITRFjump  = [false false false]; % E-N-U
 doEQjump    = [true true true]; % E-N-U
 doRemoveTs = true; % global
-doStopTs = true; % global
+doTsOverlay = false; % global
 
 % specify type of transient: "log","exp","nil"
 transientType = {...
@@ -181,7 +181,7 @@ for i = 1:3 % E-N-U
     heavJumps{i}  = years( jumps );
     % Lookup Table for relative transient timestamps, types and limits (->dhs,ip)
     tsLUT{i} = getTransientReferences(transients{i}, transientType(i,:), ...
-        lowLimit, uppLimit, doRemoveTs, doStopTs);
+        lowLimit, uppLimit, doRemoveTs);
 end
 
 % create datetime array with equal date intervals (1d)
@@ -243,8 +243,9 @@ for i = 1:3 % E-N-U
         nTau(i) = 0;
     end
     % Lookup Table for relative transient timestamps, types and limits (->gs)
+    % last argument needs to be false, transients must not be removed
     tsLUTgs{i} = getTransientReferences(transients{i}, transientType(i,:), ...
-        min(tauVec), max(tauVec), false, false);
+        min(tauVec), max(tauVec), false);
 end
 
 % other variables - get count of params (poly,osc, jumps, transients) per coordinate
@@ -289,7 +290,7 @@ for i = 1:3 % E-N-U
             coordinateName{i}, j, length(tauCell{i}), ...
             sprintf('%.4f ', tauCell{i}{j} ));
         
-        [~, result_parameterC, ~, ~] = computeTrendIRLS( params ); % LS
+        [~, result_parameterC, ~, ~] = computeTrendIRLS( params, doTsOverlay ); % LS
         fxRes(j) = result_parameterC{1,2};       % 1=RMS, 2=WRMS
         fxResAll{i}(j) = result_parameterC{1,2}; % 1=RMS, 2=WRMS, for map plot
     end
@@ -297,26 +298,27 @@ for i = 1:3 % E-N-U
     minIdx = minIdx(1);         % prevent duplicates
     
     params.tau = repmat( tauCell{i}{minIdx} , [1,nEq(i)] );       % optimum tau
-    [~, result_parameterC, xEst, ~] = computeTrendIRLS( params ); % LS: get parameters
+    [~, result_parameterC, xEst, ~] = computeTrendIRLS( params, doTsOverlay ); % LS: get parameters
     
     optP = getParamStruct([result_parameterC{1,2}, result_parameterC{2,2}, xEst'],...
         2, nPolynTerms(i), nOscParam(i), nJumps(i), nTransients(i));
     
-    trenddata = TimeFunction(... % calculate points
+    optY = TimeFunction(... % calculate points
         t, ...
         optP.polyn, ...
-        reorderSinCos( optP.oscil ), ... % rearranged oscillation amplitudes (cosine, sine)
+        optP.oscil, ... % rearranged oscillation amplitudes (cosine, sine)
         osc{i}, ...                      % periods
         heavJumps{i}, ...
         optP.jumps, ...
         repelem( transients{i}' , nTau(i) ), ...
         optP.tsamp, ...
         repmat( tauCell{i}{minIdx} , [1,nEq(i)] ), ...
-        repmat( tauTypes{i} , [1,nEq(i)] )...
+        repmat( tauTypes{i} , [1,nEq(i)] ), ...
+        doTsOverlay ...
         );
     e = {'rms', optP.error(1); 'wrms', optP.error(2)};
     
-    resStor{i}(1).trend = trenddata;
+    resStor{i}(1).trend = optY;
     resStor{i}(1).error = e;
     resStor{i}(1).optp  = optP;
     resStor{i}(1).optx  = tsLUTgs{i};
@@ -363,14 +365,15 @@ for i = 1:3 % E-N-U
     timeFn = @(a, b, c, d, e) TimeFunction(...
         t, ...
         a, ...                  % polynome term coefficients
-        reorderSinCos( b ), ... % rearranged oscillation amplitudes (cosine, sine)
+        b, ... % rearranged oscillation amplitudes (cosine, sine)
         osc{i}, ...             
         heavJumps{i}, ...
         c, ...                  % heaviside jumps
         tsLUT{i}{:,'time'}, ...
         d, ...                  % amplitudes
         e,...                   % tau
-        tsLUT{i}{:,'type'}...
+        tsLUT{i}{:,'type'}, ...
+        doTsOverlay ...
         );
     
     % optimization default parameters
@@ -393,7 +396,8 @@ for i = 1:3 % E-N-U
         params.tstype,... % type (function) of tau 2(log|exp)
         params.kk, ...    % n of iterations for IRLS
         params.p, ...     % L_p Norm for IRLS
-        params.outl...    % median(error) + standard deviation * factor -> outlier );
+        params.outl,...   % median(error) + standard deviation * factor -> outlier );
+        doTsOverlay...    % overlay flag
         );
     
     for j = 2:3 % dhs-ip
@@ -414,7 +418,7 @@ for i = 1:3 % E-N-U
         end
         
         params.tau = xMin; % set transient parameters tau
-        [~, result_parameterC, xEst, ~] = computeTrendIRLS( params ); % get parameters
+        [~, result_parameterC, xEst, ~] = computeTrendIRLS( params, doTsOverlay ); % get parameters
         optP = getParamStruct([result_parameterC{1,2}, result_parameterC{2,2}, xEst'], ...
             2, nPolynTerms(i), nOscParam(i), nJumps(i), length(xMin));
         optY = timeFn(...
@@ -460,7 +464,7 @@ for j = 1:3 % grid search-dhs-ip
             KK, p, outlFactor);
         writeOutputLog(fID, dataStation, coordinateName{i}, ...
             resStor{i}(j).optp.polyn, ...
-            reorderSinCos( resStor{i}(j).optp.oscil ), ...
+            resStor{i}(j).optp.oscil, ...
             resStor{i}(j).optp.jumps, ...
             resStor{i}(j).model.tst, ...
             resStor{i}(j).optp.tsamp, ...
@@ -558,24 +562,23 @@ s(3) = s(2)+nOsci;
 s(4) = s(3)+nJump;
 s(5) = s(4)+nTran;
 
-res.error =  params( 1    : s(1)-1 );
-res.polyn =  params( s(1) : s(2)-1 );
-res.oscil =  params( s(2) : s(3)-1 );
-res.jumps =  params( s(3) : s(4)-1 );
-res.tsamp =  params( s(4) : s(5)-1 );
+res.error = getParam(params, 1,    s(1)-1 );
+res.polyn = getParam(params, s(1), s(2)-1 );
+res.oscil = getParam(params, s(2), s(3)-1 );
+res.jumps = getParam(params, s(3), s(4)-1 );
+res.tsamp = getParam(params, s(4), s(5)-1 );
+
+    function out = getParam(p, s, e)
+        % p(arameters), s(tart index), e(nd index)
+        if e>=s
+            out = p(s:e);
+        else
+            out = [];
+        end
+    end
 end
 
-function res = reorderSinCos(osc)
-%reorders sine/cosine oscillation components
-% input: oscillation components as vector
-% (number of coefficients must be even)
-if mod(osc,2) == 1
-    error('reorderSinCos: input error: oscillation component vector must contain even number of elements')
-end
-res = [osc(1:2:end); osc(2:2:end)];
-end
-
-function out = getTrendError(x, b, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor)
-[~,results,~,~] = computeTrendIRLS(x, b, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor);
+function out = getTrendError(x, b, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay)
+[~,results,~,~] = computeTrendIRLS(x, b, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay);
 out = results{cellfun(@(x) strcmp(x,'rms'), results(:,1)),2};
 end

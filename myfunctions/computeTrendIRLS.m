@@ -1,4 +1,4 @@
-function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor)
+function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay)
 % IRLSE - Iterative Reweighted (Linear) Least Squares
 % INPUT
 %   x: vector containing time stamps in [YEARS] relative to t0
@@ -15,8 +15,9 @@ function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, polynDeg, W
 %   outl_factor: median(error)|mean(error) + standard deviation * factor -> outlier
 doLog = false;
 
-if nargin == 1
-    % assume input is parameter struct
+if nargin == 2
+    % assume input is parameter struct: reassign
+    doTsOverlay = b;        % overlay flag needs to be reassigned
     b = x.b;                % 
     polynDeg = x.poly;      % 
     W = x.w;                % 
@@ -28,6 +29,7 @@ if nargin == 1
     p = x.p;                % 
     outl_factor = x.outl;   % 
     x = x.t;                % x needs to be reassigned
+    
 elseif nargin <= 8
     % Additional Parameters for (IR)LS, use default values
     KK = 0; % n of iterations for IRLS
@@ -43,56 +45,7 @@ if length(tau) ~= length(ts_t) || length(ts_t) ~= length(tsType)
     error('LS error:transient model: length of tau,tau datetime and type of tau vectors do not match')
 end
 
-% parameter counts
-nData = length(x); % number of observations
-nPolynTerms = polynDeg+1; % 0, 1, 2, ... 
-nPeriodic = length(W); % oscillations
-nPeriodicCoeff = nPeriodic*2; % cos & sin components (C, S) for every oscillation
-nJumpCoeff = length(j_t); % All Jumps - From DB and ITRF (if set to true)
-nEqParam = length(ts_t); % number of amplitudes for transients -> transient * number of eq
-
-% Set up Map N: n of Parameter Storage Vector
-N(1) = 0;
-N(2) = N(1) + nPolynTerms;
-N(3) = N(2) + nPeriodicCoeff;
-N(4) = N(3) + nJumpCoeff;
-N(5) = N(4) + nEqParam;
-
-%% set up design matrix A
-A = zeros(nData, N(5)); % initialize (measurements x unknown parameters)
-if doLog; fprintf('Design Matrix A: %d x %d\n', size(A, 1), size(A, 2)); end
-
-% 1:POLYNOMIAL MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-for i = 0:polynDeg
-    A(:, N(1) + i + 1) = [x.^i]; % Needs +1 because of start at 0
-end
-
-% 2:OSCILLATION MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-cnt = 1; % counter for periodic coefficients
-
-for i = 1:length(W)
-    A(:, N(2)+cnt:N(2)+cnt+1) = [cos(x * W(i)), sin(x * W(i))];
-    cnt = cnt+2; % increment to match coefficients
-end
-
-% 3:JUMP MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-for i = 1:nJumpCoeff
-    % Heaviside Jump
-    A(:, N(3) + i) = heaviside(x - j_t(i));
-end
-
-% 4:TRANSIENT MODEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Calculate logarithmic transient for all earthquakes in this TS
-for i = 1:length(ts_t)
-    dt = x - ts_t(i);
-    dt(dt < 0) = 0; % Every observation BEFORE the event
-
-    if     strcmp(tsType(i),'log')
-        A(:, N(4)+i  ) = log( 1 + dt./tau(i) ); % logarithmic transient
-    elseif strcmp(tsType(i),'exp')
-        A(:, N(4)+i )  = exp( -dt./tau(i) );    % exponential transient
-    end
-end
+A = createCoeffMat(x, polynDeg, W, j_t, ts_t, tau, tsType, doTsOverlay);
 
 %% (1) Calculate initial parameters xEst from A, b
 [xEst, e] = computeLeastSquares(A, b);
@@ -168,30 +121,7 @@ results{2, 2} = wrms;
 
 if doLog;fprintf('WMRS = %.4f, RMS = %.4f\n', wrms, rms);end
 
-%% (5) sample equidistant values for TIME
-% -> for time series with LSE estimated parameters
-
-% Get Parameters and apply them on equally spaced time series
-
-% Get Polynomial parameters
-polynParam = xEst(N(1) + 1:N(2));
-% Get periodic parameters (C&S: cos, sin)
-periodicParam = xEst(N(2) + 1:N(3));
-periodicParam = [periodicParam(1:2:end - 1)'; periodicParam(2:2:end)'];
-% Get Jump/Unit Step/Heaviside Parameters
-jumpParam = xEst(N(3) + 1:N(4));
-% Get Jump/Unit Step/Heaviside Parameters
-EQtransient = xEst(N(4) + 1:N(5));
-
-% "simulated" time series (equally spaced measurements, depending on time interval)
-tInterpolation = years(days(1)); % interpolation / sampling interval in YEARS
-xSim = min(x) : tInterpolation : max(x); % interpolation
-xSim = x'; % original values, no interpolation
-% call function
-% creates y values (e.g. up values) for "simulated" time series
-y = TimeFunction(xSim, polynParam, periodicParam, W, j_t, jumpParam, ...
-    ts_t, EQtransient, tau, tsType);
-% y = A * xEst;
+y = A * xEst; % time series - trend
 end
 
 %% IRLS Custom Functions
