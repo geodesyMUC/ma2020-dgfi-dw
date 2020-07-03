@@ -65,6 +65,7 @@ osc = {[], [], []};     % common values: 0.5y, 1y
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
 doITRFjump  = [false false false]; % E-N-U
 doEQjump    = [true true true]; % E-N-U
+doRemoveTs = true; % global
 doStopTs = true; % global
 
 % specify type of transient: "log","exp","nil"
@@ -80,9 +81,9 @@ tauVec1 = years(days(1:20:200));
 tauVec2 = years(days(250:40:730));
 % tauVec1 = years(days(1:5:365)); % full range tau
 
-% optimization constraints for transient 1 and transient 2
-lowLimit = [min(tauVec1), min(tauVec2)];
-uppLimit = [max(tauVec1), max(tauVec2)];
+% optimization constraints for transient 1 and transient 2 [years]
+lowLimit = [ 1/365.25, 100/365.25];
+uppLimit = [60/365.25, 7];
 
 % Additional Parameters for LSE/IRLSE (can be adjusted with care)
 KK = 0;             % n of iterations for IRLS
@@ -178,9 +179,9 @@ for i = 1:3 % E-N-U
     % Convert to [years] & assign to cell array 
     transients{i} = years( ts_t );
     heavJumps{i}  = years( jumps );
-    % Lookup Table for relative transient timestamps, types and limits (->optimization)
+    % Lookup Table for relative transient timestamps, types and limits (->dhs,ip)
     tsLUT{i} = getTransientReferences(transients{i}, transientType(i,:), ...
-        lowLimit, uppLimit, doStopTs);
+        lowLimit, uppLimit, doRemoveTs, doStopTs);
 end
 
 % create datetime array with equal date intervals (1d)
@@ -188,11 +189,10 @@ tInterpol =  data{:, 'date'}; % take original timestamps, no interpolation
 % tInterpol =  min(data{:, 'date'}):days(1):max(data{:, 'date'}); % 1d interpolation
 dateIntvlN = length(tInterpol); % n of timestamps
 
-
 % preallocate output storages
 resStor = cell(1,3); % E-N-U
 nMethod = 3; % gs,dhs,ip
-fields = {'optp', 'xmin', 'model', 'trend', 'error', 'outl'};
+fields = {'optp', 'optx', 'model', 'trend', 'error', 'outl'};
 vals = {cell(1,nMethod), cell(1,nMethod), cell(1,nMethod), cell(1,nMethod), cell(1,nMethod), cell(1,nMethod)};
 for i = 1:3 % E-N-U
     resStor{i} = struct(...
@@ -209,6 +209,7 @@ result_parameters = cell(3, 2);
 outlier_logicals  = cell(3, 1);
 outlier_logicals  = cellfun(@(x) zeros(length(t), 1), outlier_logicals, 'UniformOutput', false); % workaround for no outliers
 
+% Grid Search
 % generate tau vector for transients containing all combinations of values
 tsFctStr = {'log','exp'}; % used to verify user input string
 tauCell = cell(3,1);
@@ -217,7 +218,7 @@ for i = 1:3 % E-N-U
     if any(strcmp( transientType{i,1} , tsFctStr )) &&  any(strcmp( transientType{i,2} , tsFctStr ))
         % Two Transients
         [tauGrid1, tauGrid2] ...
-                    = meshgrid(tauVec1, tauVec2); % create two grids
+            = meshgrid(tauVec1, tauVec2); % create two grids
         tauGrid     = cat(2, tauGrid1, tauGrid2); % cat along 2nd dimension
         tauVec      = reshape(tauGrid, [], 2);    % reshape to 2 col vector with rows (tau1, tau2)
         tauCell{i}  = num2cell(tauVec,2);
@@ -241,7 +242,9 @@ for i = 1:3 % E-N-U
         tauCell{i} = {[]};
         nTau(i) = 0;
     end
-%     tauCell{i} = tauVec;
+    % Lookup Table for relative transient timestamps, types and limits (->gs)
+    tsLUTgs{i} = getTransientReferences(transients{i}, transientType(i,:), ...
+        min(tauVec), max(tauVec), false, false);
 end
 
 % other variables - get count of params (poly,osc, jumps, transients) per coordinate
@@ -270,18 +273,15 @@ for i = 1:3 % E-N-U
     params.poly     = polynDeg(i);      % integer polynome degree
     params.w        = oscW{i};          % periods [angular velocity]
     params.jt       = heavJumps{i};     % jump timestamps [years] relative to t0
-    
-    % The following parameters need to be repeated for each transient or eq
-    % to satisfy LS Input req.
-    params.tst      = ...
-        repelem( transients{i}' , nTau(i) );     % eq transients: time in years since t0
-    params.tstype   = ...
-        repmat( tauTypes{i} , [1,nEq(i)] );      % type (function) of tau (log|exp)
+    params.tst      = tsLUTgs{i}.time;  % eq transients: time in years since t0
+    params.tstype   = tsLUTgs{i}.type;  % type (function) of tau (log|exp)
     
     fxRes = zeros( size(tauCell{i},1) , 1 ); % preallocate
     
     % tau value combination loop (grid search)
     for j = 1:length(tauCell{i})
+        % The following parameter tau need to be repeated for each transient or eq
+        % to satisfy LS Input req.
         params.tau = ...
             repmat( tauCell{i}{j} , [1,nEq(i)] ); % transient parameter tau
         
@@ -319,7 +319,7 @@ for i = 1:3 % E-N-U
     resStor{i}(1).trend = trenddata;
     resStor{i}(1).error = e;
     resStor{i}(1).optp  = optP;
-    resStor{i}(1).xmin  = repmat( tauCell{i}{minIdx} , [1,nEq(i)] );
+    resStor{i}(1).optx  = tsLUTgs{i};
     resStor{i}(1).model = params;
     
 end
@@ -425,10 +425,10 @@ for i = 1:3 % E-N-U
             xMin);
         e = {'rms', optP.error(1); 'wrms', optP.error(2)};
         % store in result struct
-        resStor{i}(j).optp = optP;
+        resStor{i}(j).optp  = optP;
         resStor{i}(j).error = e;
         resStor{i}(j).trend = optY;
-        resStor{i}(j).xmin = xMin;
+        resStor{i}(j).optx  = tsLUT{i};
         resStor{i}(j).model = params;
     end
 end
@@ -453,10 +453,11 @@ for j = 1:3 % grid search-dhs-ip
     logFile = [stationName,'.', currTime, method,'.log']; % output: log file name
     fID = fopen(fullfile(logFileFolder, logFile), 'wt');
     for i = 1:3 % E-N-U
-%         writeInputLog(fID, stationName, coordinateName{i}, data{:, 'date'}, ...
-%             polynDeg(i), osc{i}, heavJumps{i}, ...
-%             resStor{i}(j).model.tst, resStor{i}(j).model.tau, resStor{1}(1).model.tstype, ...
-%             KK, p, outlFactor);
+        writeInputLog(fID, stationName, coordinateName{i}, data{:, 'date'}, ...
+            polynDeg(i), osc{i}, heavJumps{i}, ...
+            resStor{i}(j).model.tst, resStor{i}(j).optx.lBound, resStor{i}(j).optx.uBound, ...
+            resStor{i}(j).model.tstype, ...
+            KK, p, outlFactor);
         writeOutputLog(fID, dataStation, coordinateName{i}, ...
             resStor{i}(j).optp.polyn, ...
             reorderSinCos( resStor{i}(j).optp.oscil ), ...

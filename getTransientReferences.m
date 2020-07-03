@@ -1,12 +1,16 @@
-function [tsT] = getTransientReferences(t_ts, types, low, upp, doShiftLim)
+function [tsT] = getTransientReferences(t_ts, types, low, upp, doRemoveTs, doShiftLim)
 %Creates Struct for Transients
 % Input:
 %   t_ts: vector with datetimes of events
 %   types: cell with either 1 x nTransient or nEq x nTransient
 %   low: array with lower constraints
 %   upp: array with upper constraints
+%   doRemoveTS: transient will be removed if lower limit > time to next eq
 %   doShiftLim: boolean, flag to prevent transients from overlaying subsequent
-%       eqs by shifting the upper limit
+%       eqs by shifting the upper limit. 
+%       Warning: For this to be applied, doRemoveTs also needs to be set to 
+%       true. If not, it will be ignored.
+%
 % Output:
 %   tsT: table with 4 columns {'time','type','lBound','uBound'}
 
@@ -47,15 +51,15 @@ for i = 1:length(t_ts)
                 fprintf('getTransientReferences: input eq datetimes unit must be YEARS. check: delta t = %.3f\n', dt);
                 fprintf('getTransientReferences: input transient lower limit unit must be YEARS. check: %.3f\n', upp(i,j));
                 fprintf('getTransientReferences: input transient upper limit unit must be YEARS. check: %.3f\n', low(i,j));
-                if low(i,j)>abs(dt)
+                if doRemoveTs && low(i,j)>abs(dt)
                     % skip this transient
                     fprintf('getTransientReferences: transient %d for event %d removed from model\n', j, i);
                     continue
-                elseif doShiftLim && upp(i,j)>abs(dt)
+                elseif doRemoveTs && doShiftLim && upp(i,j)>abs(dt)
                     % use dt as new constraint
                     fprintf('getTransientReferences: transient %d  for event %d upper limit overwritten\n', j, i);
                     uppNew = abs(dt);
-%                     uppNew = low(i,j)+1e-3;
+%                     uppNew = 2*low(i,j); 
                 end
             end
             % Append

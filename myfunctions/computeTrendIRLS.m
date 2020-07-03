@@ -86,6 +86,7 @@ end
 for i = 1:length(ts_t)
     dt = x - ts_t(i);
     dt(dt < 0) = 0; % Every observation BEFORE the event
+
     if     strcmp(tsType(i),'log')
         A(:, N(4)+i  ) = log( 1 + dt./tau(i) ); % logarithmic transient
     elseif strcmp(tsType(i),'exp')
