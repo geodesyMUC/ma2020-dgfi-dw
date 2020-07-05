@@ -50,6 +50,15 @@ A = createCoeffMat(x, polynDeg, W, j_t, ts_t, tau, tsType, doTsOverlay);
 %% (1) Calculate initial parameters xEst from A, b
 [xEst, e] = computeLeastSquares(A, b);
 
+w = ones( length(x),1 ) .*0.5;
+% w = w .*0.5;
+% w( getTimeIdx( 2 , x, ts_t) )         = 1;
+% w( getTimeIdx( 1 , x, ts_t) )         = 2;
+% w( getTimeIdx(years( days(105) ), x, ts_t) ) = 4;
+% w( getTimeIdx(years( days(105) ), x, ts_t) ) = 5;
+
+[xEst, e] = computeWeightedLeastSquares(A, b, w);
+
 %% (2) Detect & Remove outliers
 % check if outliers are present
 outlierLogical = abs(e) > mean(e) + std(e) * outl_factor; % Logical with outliers
@@ -62,8 +71,16 @@ if nnz(outlierLogical) > 0
     [xEst, e] = computeLeastSquares(A, b);
 end
 
+% compute errors
 rms  = computeRMS(b - A*xEst);
 wrms = computeWRMS(b - A*xEst, eye(length(b))); % weights 1 (diag matrix)
+
+fnRms = @(idx) computeRMS(b(idx) - A(idx,:)*xEst);
+
+rms35d = fnRms( getTimeIdx(years( days(35) ), x, ts_t) );
+rms105d = fnRms( getTimeIdx(years( days(105) ), x, ts_t) );
+rms1y = fnRms( getTimeIdx( 1, x, ts_t) );
+rms2y = fnRms( getTimeIdx( 2, x, ts_t) );
 
 %% (3) IRLS - weight optimization
 % to prevent unwanted behaviour when computing trends for TS with multiple
@@ -77,26 +94,33 @@ E = [];
 RMS_vector = [rms];
 WRMS_vector = [wrms];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+e(e==0) = 1e-6; % add small value to errors == 0 to prevent div by 0
+e = abs(e);
 
 for k = 1:KK
-    
     if doLog;fprintf('IRLS Iteration #%d\n', k);end
-    e(e==0) = 0.0001; % add small value to 0, so div by 0 is prevented
-    [xEst, e, w] = computeWeightedLeastSquares(A, b, e, p);
+    w = e;
+    
+    [xEst, e] = computeWeightedLeastSquares(A, b, w);
+    e(e==0) = 1e-6; % add small value to errors == 0 to prevent div by 0
+    e = abs( e );
+    
+    rms = computeRMS(b - A*xEst);
+    wrms = computeWRMS(b - A*xEst, e);
+    
+    e = abs(e).^(p - 2); % compute new weights
     
     %% Error each iteration (Used for Debugging/Monitoring iterative procedure)
     pNorm = norm(e, p); % error at each iteration
     E = [E pNorm];
     
-    rms = computeRMS(b - A*xEst);
-    wrms = rms;%computeWRMS(b - A*xEst, w); % weights 1 (diag matrix)
+    
     
     RMS_vector = [RMS_vector rms]; % append
     WRMS_vector = [WRMS_vector wrms]; % append
-    
 end
 
-% %% (4) QA Plots & Stats
+% %% (4) Debug Plots & Stats
 % figure
 % plot(0:KK, RMS_vector, 'bx-')
 % hold on
@@ -113,18 +137,26 @@ end
 % ylabel('p norm [mm]')
 % xlabel('# Iteration ->')
 
-% wrap rms and wrms into result cell for output
+% wrap errors into result cell for output
 results{1, 1} = 'rms';
 results{1, 2} = rms;
 results{2, 1} = 'wrms';
 results{2, 2} = wrms;
+results{3, 1} = 'rms35d';
+results{3, 2} = rms35d;
+results{4, 1} = 'rms105d';
+results{4, 2} = rms105d;
+results{5, 1} = 'rms1y';
+results{5, 2} = rms1y;
+results{6, 1} = 'rms2y';
+results{6, 2} = rms2y;
 
 if doLog;fprintf('WMRS = %.4f, RMS = %.4f\n', wrms, rms);end
 
 y = A * xEst; % time series - trend
 end
 
-%% IRLS Custom Functions
+%% Functions
 function [xEst, e] = computeLeastSquares(A, b)
 % Calculate parameters xEst and error vector e from A, b
 
@@ -136,7 +168,7 @@ function [xEst, e] = computeLeastSquares(A, b)
 % Option 2 ----- Pseudoinverse (Penrose-Moore)
 Nmat = A' * A; % normal equations
 n = A' * b;
-xEst = pinv(Nmat) * n;
+xEst = pinv(Nmat, 1e-8) * n;
 
 % % Option 3 --- Use Function
 % xEst = lsqInvMMult(A' * A, A' * b);
@@ -146,37 +178,31 @@ e = A * xEst - b; % Error vector
 
 end
 
-function [xEst, e, w_i] = computeWeightedLeastSquares(A, b, e_t0, p)
-% Calculate parameters xEst and error vector e from A, b, p and the
-% previous error vector e_t0
+function [xEst, e] = computeWeightedLeastSquares(A, b, w)
+% Calculate parameters xEst and error vector e from A, b and the
+% weight vector w
 
-w_i_ = abs(e_t0).^((p - 2)/2); % compute Error weights w(i) with /2 [Burrows]
-w_i = abs(e_t0).^(p - 2); % compute Error weights w(i) [Wikipedia]
-denom_p = max(sum(w_i), 0.001); % Pick maximum to prevent zero denominator for new w(i)
-Wmat = diag(w_i/denom_p); % Normalized weight matrix
+% w = abs(w).^(p - 2);       % compute Error weights w(i) [Wikipedia]
+% denom_p = max(sum(w), 0.001); % Pick maximum to prevent zero denominator for new w(i)
+% W = diag(w/denom_p);       % Normalized weight matrix
 
-% % Using Moore Penrose Pseudoinverse with tolerance
-% xEst3 = pinv(A' * Wmat * A, 0.001) * A' * Wmat * b; % Weighted LSE equation
-% 
-% % Using Moore Penrose Pseudoinverse
-% xEst2 = pinv(A' * Wmat * A) * A' * Wmat * b; % Weighted LSE equation
-% 
-% % Using \
-% xEst = A' * Wmat * A \ A' * Wmat * b; % Weighted LSE equation
+W = diag(w);
 
-Nmat = A' * Wmat * A; % normal equations
-n = A' * Wmat * b;
-
-WA = Wmat * A; % [Burrows]
-N_ = WA' * WA; % [Burrows]
-if nnz(isnan(N_))
-    error('error: matrix N = transp(A) * Wmat * A contains NaN.') % Test: if matrix contains NaN -> Abort
+N = A'*W*A; % normal equations
+if nnz(isnan(N))
+    error('computeWeightedLeastSquares: error: matrix N = transp(A) * Wmat * A contains NaN.') % If matrix contains NaN -> Abort
 end
-xEst_ = pinv(N_) * (WA' * Wmat) * b;
+n = A'*W*b;
+% xEst = lsqInvMMult(N, n);
+xEst = pinv(N, 1e-8) * n;
+
+% WA = W * A; % [Burrows]
+% N_ = WA' * WA; % [Burrows]
+
+% xEst_ = pinv(N_) * (WA' * W) * b;
 % xEst_ = lsqInvMMult(N_, (WA' * Wmat) * b); % [Burrows] % Alternative: Use Function
 
-xEst = pinv(Nmat) * n;
-% xEst = lsqInvMMult(A' * A, A' * b); % Alternative: Use Function
+% xEst = pinv(N) * n;
 
 e = A * xEst - b; % Error vector
 
@@ -187,8 +213,11 @@ nData = length(e); % number of observations
 rms = sqrt(1/nData * sum((e).^2)); % root mean square
 end
 
-function [wrms] = computeWRMS(e, w_i)
-wrms = sqrt( diag(w_i)'*e.^2 / sum( diag(w_i) ) ); % weighted root mean square
+function [wrms] = computeWRMS(e, w)
+if size(w,1)>1 && size(w,2)>1
+    w = diag(w); % make vector if matrix
+end
+wrms = sqrt( w'*e.^2 / sum( w ) ); % weighted root mean square
 end
 
 function x = lsqInvMMult(A, B)
@@ -201,6 +230,22 @@ try
 catch
     % Using Moore Penrose Pseudoinverse with tolerance
     if doLog; fprintf('Using Moore-Penrose pseudoinverse for Inversion of normal equation matrix.\n'); end
-    x = pinv(A, 0.001) * B;
+    x = pinv(A, 0.00001) * B;
+end
+end
+
+function idx = getTimeIdx( tLim, t, ts )
+%GETTIMEIDX creates logical vector
+% input:
+%   tLim time limit in [years]
+%   t timestamp vector in [years]
+%   ts transients in [years]
+uniqt = unique( ts );
+idx = false( length(t),1 );
+for i = 1:length(uniqt)
+    s = uniqt(i);
+    e = uniqt(i) + tLim;
+    idxNew = and( t>=s , t<e ) ;
+    idx = or( idx, idxNew );
 end
 end

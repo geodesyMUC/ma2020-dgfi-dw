@@ -14,11 +14,13 @@ function [tsT] = getTransientReferences(t_ts, types, low, upp, doRemoveTs)
 % Output:
 %   tsT: table with 4 columns {'time','type','lBound','uBound'}
 
+tsT = cell2table(cell(0,4), 'VariableNames', {'time','type','lBound','uBound'});
+
 % check out function input
 if ~isempty(t_ts)
     if size(types, 1) == 1 && ...
-            size(types, 2) == size(low, 2) && ...
-            size(types, 2) == size(upp, 2)
+            sum(~strcmp(types, '')) == size(low, 2) && ...
+            sum(~strcmp(types, '')) == size(upp, 2)
         % input is type for ALL eq (default taus)
         fprintf('getTransientReferences: type of transient input recognized as global\n')
         isGlobal = true;
@@ -28,14 +30,24 @@ if ~isempty(t_ts)
         % input is type for EACH eq (custom taus)
         fprintf('getTransientReferences: type of transient input recognized as local\n')
         isGlobal = false;
+    elseif any(~strcmp(types, '')) && size(types, 1) == 1 && ...
+            size(types, 2) == size(low, 2) && ...
+            size(low, 2) == size(upp, 2)
+        % input transients < lower limit/upper limit. adjust limits 
+        fprintf('getTransientReferences: number of transient types ~=  number of limits.')
+        %low = low(~strcmp(types, ''));
+        %upp = upp(~strcmp(types, ''));
+        isGlobal = true;
+    elseif ~any(~strcmp(types, ''))
+         fprintf('getTransientReferences: no transients to be estimated\n')
+         return
     elseif length(t_ts) ~= size(types, 1)
-        error('getTransientReferences: input mismatch: number of transient types ~=  number of earthquakes')
+        error('getTransientReferences: input mismatch: number of transient types ~=  number of earthquakes') 
     elseif size(types, 1) ~= size(upp, 1) || size(types, 1) ~= size(low, 1)
         error('getTransientReferences: input mismatch: number of constraints ~=  number of earthquakes')
     end
 end
-
-tsT = cell2table(cell(0,4), 'VariableNames', {'time','type','lBound','uBound'});
+fprintf('getTransientReferences: global tau is "%s"\n', mat2str(isGlobal)); 
 for i = 1:length(t_ts)
     if isGlobal
         eqidx = 1;
@@ -58,7 +70,7 @@ for i = 1:length(t_ts)
                 elseif doRemoveTs && upp(eqidx,j)>abs(dt)
                     warning('getTransientReferences:mismatch', ' transient %d  for event %d upper limit overwritten\n', j, i)
                     % use dt as new constraint ? set new value for uppNew
-%                     uppNew = abs(dt); warning('progr:Nneg', 'Input N=%d must be positive\n',N);
+%                     uppNew = abs(dt);
 %                     uppNew = 2*low(i,j); 
                 end
             end

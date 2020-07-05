@@ -52,27 +52,28 @@ doStaticFile = true;
 % stationName = '21701S007A03'; % KSMV %[ok]
 % stationName = '21702M002A07'; % MIZU %[ok]
 % stationName = '21729S007A04'; % USUDA %[ok]
-stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
+% stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
-% stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
+stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
 % stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
 % stationName = '41719M004A02'; % Concepcion %[ok]
 
 %%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-polynDeg = [1, 1, 1];% Polynomial Trend,Integer Degree, Range [-1..3]
+polynDeg = [-1, -1, -1];% Polynomial Trend,Integer Degree, Range [-1..3]
 % periods / oscillations in YEARS (=365.25 days) in vector form
 osc = {[], [], []};     % common values: 0.5y, 1y
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
 doITRFjump  = [false false false]; % E-N-U
-doEQjump    = [true true true]; % E-N-U
+doEQjump    = [false false false]; % E-N-U
 doRemoveTs = true; % global
 doTsOverlay = false; % global
+tarFct = 'rms';
 
 % specify type of transient: "log","exp","nil"
 transientType = {...
-    'log','log'; ...    % coordinate1:E|X
-    'log','log'; ...    % coordinate2:N|Y
-    'log','log'};       % coordinate3:U|Z
+    '',''; ...    % coordinate1:E|X
+    '',''; ...    % coordinate2:N|Y
+    '',''};       % coordinate3:U|Z
 
 % Parameter tau in [years] for computation of logarithmic transient for
 % earthquake events (jumps):
@@ -85,9 +86,9 @@ tauVec2 = years(days(250:40:730));
 lowLimit = [ 1/365.25, 100/365.25];
 uppLimit = [60/365.25, 7];
 
-% Additional Parameters for LSE/IRLSE (can be adjusted with care)
+% Additional Parameters for LSE/IRLSE
 KK = 0;             % n of iterations for IRLS
-p = 2.0;            % L_p Norm for IRLS
+p = 1.0;            % L_p Norm for IRLS
 outlFactor = 100;   % median(error) + standard deviation * factor -> outlier
 
 % other variables
@@ -145,7 +146,7 @@ oscW = cellfun(@(x) 2*pi./x, osc, 'UniformOutput', false);
 
 % Time Series Timestamps
 t  = data{:, 't'};       % timestamps [seconds];
-t = years( seconds(t) ); % convert timestamps to [years]
+t  = years( seconds(t) ); % convert timestamps to [years]
 t  = t-t(1);             % adjust for negative t values
 t0 = data{1, 'date'};    % timestamp [datetime] of first measurement
 
@@ -226,25 +227,26 @@ for i = 1:3 % E-N-U
         nTau(i)     = 2;
     elseif any(strcmp( transientType{i,1} , tsFctStr )) && ~any(strcmp( transientType{i,2} , tsFctStr ))
         % One Transient (tau_short)
-        tauTypes{i} = transientType{i,1};
+        tauTypes{i} = {transientType{i,1}};
         tauVec      = tauVec1';
         tauCell{i}  = num2cell(tauVec,2);
         nTau(i)     = 1;
     elseif ~any(strcmp( transientType{i,1} , tsFctStr )) &&  any(strcmp( transientType{i,2} , tsFctStr ))
         % One Transient (tau_long)
-        tauTypes{i} = transientType{i,2};
+        tauTypes{i} = {transientType{i,2}};
         tauVec      = tauVec2';
         tauCell{i}  = num2cell(tauVec,2);
         nTau(i)     = 1;
     else
         % No Transients, no match found
-        tauTypes{i} = '';
+        tauVec = [];
+        tauTypes{i} = {''};
         tauCell{i} = {[]};
         nTau(i) = 0;
     end
     % Lookup Table for relative transient timestamps, types and limits (->gs)
     % last argument needs to be false, transients must not be removed
-    tsLUTgs{i} = getTransientReferences(transients{i}, transientType(i,:), ...
+    tsLUTgs{i} = getTransientReferences(transients{i}, tauTypes{i}, ...
         min(tauVec), max(tauVec), false);
 end
 
@@ -291,8 +293,8 @@ for i = 1:3 % E-N-U
             sprintf('%.4f ', tauCell{i}{j} ));
         
         [~, result_parameterC, ~, ~] = computeTrendIRLS( params, doTsOverlay ); % LS
-        fxRes(j) = result_parameterC{1,2};       % 1=RMS, 2=WRMS
-        fxResAll{i}(j) = result_parameterC{1,2}; % 1=RMS, 2=WRMS, for map plot
+        fxRes(j) = result_parameterC{ strcmp(result_parameterC(:,1), tarFct) , 2};
+        fxResAll{i}(j) = result_parameterC{ strcmp(result_parameterC(:,1), tarFct) , 2};
     end
     [~, minIdx] = min( fxRes ); % minimization min( f(x) )
     minIdx = minIdx(1);         % prevent duplicates
@@ -310,16 +312,15 @@ for i = 1:3 % E-N-U
         osc{i}, ...                      % periods
         heavJumps{i}, ...
         optP.jumps, ...
-        repelem( transients{i}' , nTau(i) ), ...
+        params.tst, ...
         optP.tsamp, ...
         repmat( tauCell{i}{minIdx} , [1,nEq(i)] ), ...
-        repmat( tauTypes{i} , [1,nEq(i)] ), ...
+        params.tstype, ...
         doTsOverlay ...
         );
-    e = {'rms', optP.error(1); 'wrms', optP.error(2)};
     
     resStor{i}(1).trend = optY;
-    resStor{i}(1).error = e;
+    resStor{i}(1).error = result_parameterC;
     resStor{i}(1).optp  = optP;
     resStor{i}(1).optx  = tsLUTgs{i};
     resStor{i}(1).model = params;
@@ -341,7 +342,7 @@ end
 for i = 1:3 % E-N-U
     if size(tauCell{i}{1},2) == 1 % 1 tau
         figure
-        plot(days(years( cell2mat(tauCell{i}) )) , resultCell{i}(:,1) )
+        plot(days(years( cell2mat(tauCell{i}) )) , fxResAll{i}(:) )
         xlabel('\tau_{log} [days]')
         ylabel('rms [mm]')
         title(["\tau parameter space for ", coordinateName{i}])
@@ -397,7 +398,8 @@ for i = 1:3 % E-N-U
         params.kk, ...    % n of iterations for IRLS
         params.p, ...     % L_p Norm for IRLS
         params.outl,...   % median(error) + standard deviation * factor -> outlier );
-        doTsOverlay...    % overlay flag
+        doTsOverlay, ...  % overlay flag
+        tarFct ...        % name of target fct for optimization
         );
     
     for j = 2:3 % dhs-ip
@@ -427,10 +429,9 @@ for i = 1:3 % E-N-U
             optP.jumps, ...
             optP.tsamp, ...
             xMin);
-        e = {'rms', optP.error(1); 'wrms', optP.error(2)};
         % store in result struct
         resStor{i}(j).optp  = optP;
-        resStor{i}(j).error = e;
+        resStor{i}(j).error = result_parameterC;
         resStor{i}(j).trend = optY;
         resStor{i}(j).optx  = tsLUT{i};
         resStor{i}(j).model = params;
@@ -550,10 +551,11 @@ for j = 1:3 % grid search-dhs-ip
         saveas(figRes, fullfile(plot_dir, plot_title));
     end
 end
-%%
+%% End
 fprintf('Done!\n')
 % close all
 
+%% Functions
 function res = getParamStruct(params, os, nPoly, nOsci, nJump, nTran)
 %gets result from parameter vector and writes them to struct.
 s(1) = os+1;
@@ -578,7 +580,10 @@ res.tsamp = getParam(params, s(4), s(5)-1 );
     end
 end
 
-function out = getTrendError(x, b, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay)
+function out = getTrendError(x, b, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay, tarFct)
 [~,results,~,~] = computeTrendIRLS(x, b, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay);
-out = results{cellfun(@(x) strcmp(x,'rms'), results(:,1)),2};
+if isempty(strcmp(x, tarFct))
+    error('getTrendError: target function "%s" for optimization was not found', tarFct);
+end
+out = results{cellfun(@(x) strcmp(x,tarFct), results(:,1)),2};
 end
