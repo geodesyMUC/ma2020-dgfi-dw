@@ -1,4 +1,4 @@
-function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay)
+function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, w, polynDeg, osc, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay)
 % IRLSE - Iterative Reweighted (Linear) Least Squares
 % INPUT
 %   x: vector containing time stamps in [YEARS] relative to t0
@@ -17,10 +17,11 @@ doLog = false;
 
 if nargin == 2
     % assume input is parameter struct: reassign
-    doTsOverlay = b;        % overlay flag needs to be reassigned
+    doTsOverlay = b;        % overlay flag, needs to be reassigned
     b = x.b;                % 
+    w = x.w;                %
     polynDeg = x.poly;      % 
-    W = x.w;                % 
+    osc = x.o;              % 
     j_t = x.jt;             % 
     ts_t = x.tst;           % 
     tau = x.tau;            % 
@@ -45,20 +46,16 @@ if length(tau) ~= length(ts_t) || length(ts_t) ~= length(tsType)
     error('LS error:transient model: length of tau,tau datetime and type of tau vectors do not match')
 end
 
-A = createCoeffMat(x, polynDeg, W, j_t, ts_t, tau, tsType, doTsOverlay);
+A = createCoeffMat(x, polynDeg, osc, j_t, ts_t, tau, tsType, doTsOverlay);
 
-%% (1) Calculate initial parameters xEst from A, b
-[xEst, e] = computeLeastSquares(A, b);
-
-w = ones( length(x),1 ) .*0.5;
-% w = w .*0.5;
-% w( getTimeIdx( 2 , x, ts_t) )         = 1;
-% w( getTimeIdx( 1 , x, ts_t) )         = 2;
-% w( getTimeIdx(years( days(105) ), x, ts_t) ) = 4;
-% w( getTimeIdx(years( days(105) ), x, ts_t) ) = 5;
-
-[xEst, e] = computeWeightedLeastSquares(A, b, w);
-
+%% (1) Calculate initial parameters xEst from A, b (and weights w)
+if w == ones(length(w),1)
+    % OLS
+    [xEst, e] = computeLeastSquares(A, b);
+else
+    % WLS
+    [xEst, e] = computeWeightedLeastSquares(A, b, w);
+end
 %% (2) Detect & Remove outliers
 % check if outliers are present
 outlierLogical = abs(e) > mean(e) + std(e) * outl_factor; % Logical with outliers
@@ -73,7 +70,7 @@ end
 
 % compute errors
 rms  = computeRMS(b - A*xEst);
-wrms = computeWRMS(b - A*xEst, eye(length(b))); % weights 1 (diag matrix)
+wrms = computeWRMS(b - A*xEst, w); % weights 1 (diag matrix)
 
 fnRms = @(idx) computeRMS(b(idx) - A(idx,:)*xEst);
 

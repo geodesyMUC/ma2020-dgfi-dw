@@ -59,21 +59,22 @@ stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, do
 % stationName = '41719M004A02'; % Concepcion %[ok]
 
 %%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-polynDeg = [-1, -1, -1];% Polynomial Trend,Integer Degree, Range [-1..3]
+polynDeg = [1, 1, 1];% Polynomial Trend,Integer Degree, Range [-1..3]
 % periods / oscillations in YEARS (=365.25 days) in vector form
 osc = {[], [], []};     % common values: 0.5y, 1y
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
 doITRFjump  = [false false false]; % E-N-U
-doEQjump    = [false false false]; % E-N-U
+doEQjump    = [true true true]; % E-N-U
 doRemoveTs = true; % global
 doTsOverlay = false; % global
+doWeighting = true;
 tarFct = 'rms';
 
 % specify type of transient: "log","exp","nil"
 transientType = {...
-    '',''; ...    % coordinate1:E|X
-    '',''; ...    % coordinate2:N|Y
-    '',''};       % coordinate3:U|Z
+    'log','log'; ...    % coordinate1:E|X
+    'log','log'; ...    % coordinate2:N|Y
+    'log','log'};       % coordinate3:U|Z
 
 % Parameter tau in [years] for computation of logarithmic transient for
 % earthquake events (jumps):
@@ -259,6 +260,28 @@ for i = 1:3 % E-N-U
     nTransients(i) = nEq(i) * nTau(i); % Only EQ Jumps -> n of transients
 end
 
+% Compute Weights
+w = zeros(length(t), 3);
+for i = 1:3 % E,N,U
+    if doWeighting
+        tNormal = 0.25; % [years]
+        wNormal = 1; % default weight
+        wEq = 10;     % weight at t=t_ts
+        w(:,i) = wNormal;
+        tTs = unique( tsLUT{i}.time );
+        for j = 1:length( tTs )
+            dt = t - tTs(j);
+            wx = interp1([1e-3, tNormal], [wEq, wNormal], dt, 'linear');
+            wxIdx = ~isnan(wx);
+            w( wxIdx,i ) = wx( wxIdx );
+        end
+%         figure
+%         plot(data{:, 'date'}, w(:,i))
+    else
+        w(:,i) = deal(1);
+    end
+end
+
 % prepare array to store results rms,wrms,est.params FOR EVERY COMBINATION
 % OF TAU (rows) and E,N,U (cols)
 fxResAll = cell(3,1);
@@ -274,11 +297,11 @@ params.outl     = outlFactor;           % median(error) + standard deviation * f
 for i = 1:3 % E-N-U
     params.b        = data{:,i+2};      % vector with metric (coordinate)
     params.poly     = polynDeg(i);      % integer polynome degree
-    params.w        = oscW{i};          % periods [angular velocity]
+    params.o        = oscW{i};          % periods [angular velocity]
     params.jt       = heavJumps{i};     % jump timestamps [years] relative to t0
     params.tst      = tsLUTgs{i}.time;  % eq transients: time in years since t0
     params.tstype   = tsLUTgs{i}.type;  % type (function) of tau (log|exp)
-    
+    params.w        = w(:,i);
     fxRes = zeros( size(tauCell{i},1) , 1 ); % preallocate
     
     % tau value combination loop (grid search)
@@ -380,17 +403,19 @@ for i = 1:3 % E-N-U
     % optimization default parameters
     params.b        = data{:,i+2};  % vector with metric (coordinate)
     params.poly     = polynDeg(i);  % polynome degree
-    params.w        = oscW{i};      % periods
+    params.o        = oscW{i};      % periods
     params.jt       = heavJumps{i}; % jumps: time in years relative to t0
     params.tst      = tsLUT{i}{:,'time'}';% eq transients: time in years since t0
     params.tstype   = tsLUT{i}{:,'type'}';  % type (function) of tau (log|exp)
+    params.w        = w(:,i); % weights
     
     % function for optimization
     optFun = @(x) getTrendError(...
         params.t, ...     % t in years where t0=beginning of TS
         params.b, ...     % vector with metric (coordinate)
+        params.w, ...     % weights
         params.poly, ...  % polynome degree
-        params.w, ...     % periods
+        params.o, ...     % periods
         params.jt, ...    % jumps: time in years since t0
         params.tst, ...   % eq transients: time in years since t0
         x, ...            % transient parameter tau
@@ -580,8 +605,8 @@ res.tsamp = getParam(params, s(4), s(5)-1 );
     end
 end
 
-function out = getTrendError(x, b, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay, tarFct)
-[~,results,~,~] = computeTrendIRLS(x, b, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay);
+function out = getTrendError(x, b, w, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay, tarFct)
+[~,results,~,~] = computeTrendIRLS(x, b, w, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay);
 if isempty(strcmp(x, tarFct))
     error('getTrendError: target function "%s" for optimization was not found', tarFct);
 end
