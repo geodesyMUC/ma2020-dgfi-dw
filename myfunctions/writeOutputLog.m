@@ -1,4 +1,4 @@
-function [] = writeOutputLog(fID, station, cnName, polyn, osc, jump, t_ts, tsAmp, tsTau, rms, wrms)
+function [] = writeOutputLog(fID, station, cnName, polyn, osc, jump, t_ts, tsAmp, tsTau, errors)
 %writeOutputLog writes output parameters to a formatted log file
 %   fID: log file identifier
 %   ts_name: Name of Time Series
@@ -9,14 +9,14 @@ function [] = writeOutputLog(fID, station, cnName, polyn, osc, jump, t_ts, tsAmp
 %   EQJump: vector containing jump times for earthquakes in [SECONDS] relative to t0 (if not specified -> empty)
 %   rms: estimated root mean square
 %   wrms: estimated weighted root mean square
-fprintf(fID, '### RESULTS: Station %s, Coordinate "%s" ###\n', station, cnName);
+fprintf(fID, '## RESULTS: Station %s, Coordinate "%s" -----------------------------------\n', station, cnName);
 
 if ~isempty(polyn)
-    strP = sprintf('%.3f;\n', polyn);
+    strP = sprintf('%.3f\n', polyn);
 else
     strP = sprintf('%s\n', 'none estimated');
 end
-fprintf(fID, 'Polynomial Coefficients:\n%s\n', strP);
+fprintf(fID, '# Polynomial Coefficients\n%s\n', strP);
 
 if ~isempty(osc)
     strO = '';
@@ -27,14 +27,14 @@ if ~isempty(osc)
 else
     strO = sprintf('%s\n', 'none estimated');
 end
-fprintf(fID, 'Oscillation Amplitudes [cosine sine]:\n%s\n', strO);
+fprintf(fID, '# Oscillation Amplitude Components (cosine; sine)\n%s\n', strO);
 
 if ~isempty(jump)
-    strJ = sprintf('%.3f;\n', jump);
+    strJ = sprintf('%.3f\n', jump);
 else
     strJ = sprintf('%s\n', 'none estimated', '\n');
 end
-fprintf(fID, 'Heaviside Jump Coefficients:\n%s\n', strJ);
+fprintf(fID, '# Heaviside Jump Coefficients\n%s\n', strJ);
 
 % reshape tau/ts amp
 nTs = length(t_ts); % number of transients
@@ -49,7 +49,7 @@ if ~isempty(tsTau)
 else
     strR = sprintf('%s\n', 'none estimated');
 end
-fprintf(fID, 'Transient Relaxation Times Tau (days):\n%s\n', strR);
+fprintf(fID, '# Transient Relaxation Times Tau (days)\n%s\n', strR);
 
 % tau amplitudes
 if ~isempty(tsAmp)
@@ -61,8 +61,12 @@ if ~isempty(tsAmp)
 else
     strT = sprintf('%s\n', 'none estimated');
 end
-fprintf(fID, 'Transient Amplitudes [tau1 tau2](per Earthquake):\n%s\n', strT);
-
-fprintf(fID, 'RMS:\n%.3f;\nWRMS:\n%.3f;\n\n', rms, wrms);
+fprintf(fID, '# Transient Amplitudes\n%s\n', strT);
+% errors
+fprintf(fID, '# Error metrics\n');
+for i = 1:size(errors,1)
+    fprintf(fID, '%s: %.3f\n', pad(errors{i,1}, 8),errors{i,2});
+end
+fprintf(fID, '\n');
 end
 

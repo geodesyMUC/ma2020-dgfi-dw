@@ -51,10 +51,10 @@ doStaticFile = true;
 
 % stationName = '21701S007A03'; % KSMV %[ok]
 % stationName = '21702M002A07'; % MIZU %[ok]
-% stationName = '21729S007A04'; % USUDA %[ok]
+stationName = '21729S007A04'; % USUDA %[ok]
 % stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
-stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
+% stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
 % stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
 % stationName = '41719M004A02'; % Concepcion %[ok]
 
@@ -67,7 +67,7 @@ doITRFjump  = [false false false]; % E-N-U
 doEQjump    = [true true true]; % E-N-U
 doRemoveTs = true; % global
 doTsOverlay = false; % global
-doWeighting = true;
+doWeighting = [true true true];
 tarFct = 'rms';
 
 % specify type of transient: "log","exp","nil"
@@ -262,21 +262,50 @@ end
 
 % Compute Weights
 w = zeros(length(t), 3);
+figure
 for i = 1:3 % E,N,U
-    if doWeighting
-        tNormal = 0.25; % [years]
-        wNormal = 1; % default weight
-        wEq = 10;     % weight at t=t_ts
-        w(:,i) = wNormal;
+    if doWeighting(i)
+        wFactor = -0.50;
+        twS  = 0; % rel. time to ts 
+        twN = 2; % [years]
+        wNo = 1;    % default weight
+        wEq = 10;       % weight at t=t_ts
+        w(:,i) = wNo;
         tTs = unique( tsLUT{i}.time );
-        for j = 1:length( tTs )
+        
+        for j = 1:length( tTs ) % Loop Transients
+            twSta = [twS; wEq];
+            twMid = [twS + (twN-twS)*0.5 ; wNo + (wEq-wNo)*0.5];
+            
+            if ( wEq-wNo ) < ( twN-twS )
+                scale =  norm( twSta-twMid ) * ( wEq-wNo )/( twN-twS );
+            else
+                scale =  norm( twSta-twMid ) * ( twN-twS )/( wEq-wNo );
+            end
+            
+            V = twSta - twMid;
+            nuV = [ V(2); -V(1) ] ./ norm( V ) * scale * wFactor;
+            twPivot = twMid + nuV;
+            
+            
             dt = t - tTs(j);
-            wx = interp1([1e-3, tNormal], [wEq, wNormal], dt, 'linear');
+            wLine = [...
+                twS, twPivot(1), twN; ...
+                wEq, twPivot(2), wNo];
+            wx = interp1(wLine(1,:), wLine(2,:), dt, 'pchip', NaN);
             wxIdx = ~isnan(wx);
             w( wxIdx,i ) = wx( wxIdx );
         end
-%         figure
-%         plot(data{:, 'date'}, w(:,i))
+        subplot(3,1,i) % debug
+        plot(t,w(:,i)) % debug
+        hold on % debug
+        plot([twMid(1) twPivot(1)],[twMid(2) twPivot(2)], 'r'); % debug
+        plot(wLine(1,:), wLine(2,:), 'gx') % debug
+        grid on % debug
+        ylabel('weight') % debug
+        xlabel('t') % debug
+        title(sprintf('weighting %s', coordinateName{i})) % debug
+        legend({'weights', 'pivot line', 'weight controls'})
     else
         w(:,i) = deal(1);
     end
@@ -495,7 +524,7 @@ for j = 1:3 % grid search-dhs-ip
             resStor{i}(j).model.tst, ...
             resStor{i}(j).optp.tsamp, ...
             resStor{i}(j).model.tau, ... 
-            resStor{i}(j).error{1,2}, resStor{i}(j).error{2,2}...
+            resStor{i}(j).error ...
             )
     end
     fclose(fID); % close log file

@@ -3,6 +3,9 @@ function [A] = createCoeffMat(t, polyd, w, j_t, ts_t, tsTau, tsType, doTsOverlay
 
 %% prepare variables
 % parameter counts
+if size(t,1) < size(t,2)
+    t = t';
+end
 nData = length(t); % number of observations
 nPolynTerms = polyd+1; % 0, 1, 2, ...
 nPeriodic = length(w); % oscillations
