@@ -46,7 +46,26 @@ if length(tau) ~= length(ts_t) || length(ts_t) ~= length(tsType)
     error('LS error:transient model: length of tau,tau datetime and type of tau vectors do not match')
 end
 
-A = createCoeffMat(x, polynDeg, osc, j_t, ts_t, tau, tsType, doTsOverlay);
+% set up design matrix
+nCoord = size(x,1);
+nB = size(x,2);
+A = zeros( nnz(x) , sum(polynDeg)+nCoord + length(osc)*2*nCoord + numel(j_t) + numel(ts_t) );
+nxEst = 0;
+for i = 1:nCoord
+    j = (i-1)*nB + 1;
+    k = nxEst + 1;
+    nxEst = nxEst + polynDeg(i) + 1 + length(osc)*2 + size(j_t,2) + size(ts_t,2);
+    A( j:nB*i , k:nxEst ) = createCoeffMat(x(i,:), polynDeg(i), osc, j_t(i,:), ts_t(i,:), tau, tsType(i, :), doTsOverlay);
+end
+% timestamps, measurements, weights
+x = x';
+x = x(:);
+
+b = b';
+b = b(:);
+
+w = w';
+w = w(:);
 
 %% (1) Calculate initial parameters xEst from A, b (and weights w)
 if w == ones(length(w),1)

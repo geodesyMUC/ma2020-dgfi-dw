@@ -324,39 +324,38 @@ for i = 1:3 % E-N-U
     fxResAll{i} = zeros( size(tauCell{i},1) , 1 );
 end
 
+%% Set up Parameter Estimation Model for Grid Search
+% E,N
+ params{1} = getParameterModel(KK, p, outlFactor, [t,t]', [data{:,3}, data{:,4}]', ...
+     [polynDeg(1); polynDeg(2)], oscW{1}, [heavJumps{1}; heavJumps{2}], ...
+     [tsLUTgs{1}.time'; tsLUTgs{2}.time'], [tsLUTgs{1}.type'; tsLUTgs{2}.type'], [w(:,1), w(:,2)]');
+ % U
+ params{2} = getParameterModel(KK, p, outlFactor, t, data{:,5}, polynDeg(3), oscW{3}, heavJumps{3}, ...
+     tsLUTgs{3}.time, tsLUTgs{3}.type, w(:,3));
+    
+
 %% Parameter Estimation (Grid Search)
-params.t        = t';                    % timestamps [years], must be sorted
-params.kk       = KK;                   % n of iterations for IRLS
-params.p        = p;                    % L_p Norm for IRLS
-params.outl     = outlFactor;           % median(error) + standard deviation * factor -> outlier
-for i = 1:3 % E-N-U
-    params.b        = data{:,i+2}';      % vector with metric (coordinate)
-    params.poly     = polynDeg(i);      % integer polynome degree
-    params.o        = oscW{i};          % periods [angular velocity]
-    params.jt       = heavJumps{i};     % jump timestamps [years] relative to t0
-    params.tst      = tsLUTgs{i}.time';  % eq transients: time in years since t0
-    params.tstype   = tsLUTgs{i}.type';  % type (function) of tau (log|exp)
-    params.w        = w(:,i);
+for i = 1:length(params) % E-N-U
     fxRes = zeros( size(tauCell{i},1) , 1 ); % preallocate
     
     % tau value combination loop (grid search)
     for j = 1:length(tauCell{i})
         % The following parameter tau need to be repeated for each transient or eq
         % to satisfy LS Input req.
-        params.tau = ...
+        params{i}.tau = ...
             repmat( tauCell{i}{j} , [1,nEq(i)] ); % transient parameter tau
         
         fprintf('LS for "%s" (%d of %d), tau=[%s\b] ...\n', ...
             coordinateName{i}, j, length(tauCell{i}), ...
             sprintf('%.4f ', tauCell{i}{j} ));
         
-        [~, result_parameterC, ~, ~] = computeTrendIRLS( params, doTsOverlay ); % LS
+        [~, result_parameterC, ~, ~] = computeTrendIRLS( params{i}, doTsOverlay ); % LS
         fxRes(j) = result_parameterC{ strcmp(result_parameterC(:,1), tarFct) , 2};
         fxResAll{i}(j) = result_parameterC{ strcmp(result_parameterC(:,1), tarFct) , 2};
     end
     [~, minIdx] = min( fxRes ); % minimization min( f(x) )
     minIdx = minIdx(1);         % prevent duplicates
-    
+    %%% CONTINUE HERE %%% !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     params.tau = repmat( tauCell{i}{minIdx} , [1,nEq(i)] );       % optimum tau
     [~, result_parameterC, xEst, ~] = computeTrendIRLS( params, doTsOverlay ); % LS: get parameters
     
@@ -639,6 +638,21 @@ res.tsamp = getParam(params, s(4), s(5)-1 );
             out = [];
         end
     end
+end
+
+function res = getParameterModel(kk, p, outl, t, b, poly, o, jt, tst, tstype, w)
+res.kk       = kk;      % n of iterations for IRLS
+res.p        = p;       % L_p Norm for IRLS
+res.outl     = outl;    % median(error) + standard deviation * factor -> outlier
+
+res.t        = t;       % timestamps [years], must be sorted
+res.b        = b;       % vector with metric (coordinate)
+res.poly     = poly;    % integer polynome degree
+res.o        = o;       % periods [angular velocity]
+res.jt       = jt;      % jump timestamps [years] relative to t0
+res.tst      = tst;     % eq transients: time in years since t0
+res.tstype   = tstype;  % type (function) of tau (log|exp)
+res.w        = w;       % weights
 end
 
 function out = getTrendError(x, b, w, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay, tarFct)
