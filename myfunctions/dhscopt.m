@@ -47,7 +47,11 @@ while restarts <= maxRestarts
     end
     X = x_;
     
-    if doPlot; pX = plotSimplex(X); pause(1); delete(pX); end
+    if doPlot 
+        pX = plotSimplex(X); 
+        pause(1); 
+        delete(pX); 
+    end
     
     % DHS Iteration Loop
     s = Inf;
@@ -55,7 +59,9 @@ while restarts <= maxRestarts
     tries = maxTries;
     while s > tol && tries >= 0
         % fprintf('curr stddev: %.5f\n', s)
-        if doPlot; pS = plotSimplex(X); end
+        if doPlot 
+            pS = plotSimplex(X); 
+        end
         
         fX = zeros(n+1,1);
         for i = 1:n+1

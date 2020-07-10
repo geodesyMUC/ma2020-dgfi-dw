@@ -67,7 +67,7 @@ doITRFjump  = [false false false]; % E-N-U
 doEQjump    = [true true true]; % E-N-U
 doRemoveTs = true; % global
 doTsOverlay = false; % global
-doWeighting = [true true true];
+doWeighting = [false false false];
 tarFct = 'rms';
 
 % specify type of transient: "log","exp","nil"
@@ -80,12 +80,12 @@ transientType = {...
 % earthquake events (jumps):
 % vector mapping different T (tau) relaxation coefficients [years]
 tauVec1 = years(days(1:20:200));
-tauVec2 = years(days(250:40:730));
+tauVec2 = years(days(250:30:730));
 % tauVec1 = years(days(1:5:365)); % full range tau
 
 % optimization constraints for transient 1 and transient 2 [years]
-lowLimit = [ 1/365.25, 100/365.25];
-uppLimit = [60/365.25, 7];
+lowLimit = [ 1/365.25, 250/365.25];
+uppLimit = [200/365.25, 5];
 
 % Additional Parameters for LSE/IRLSE
 KK = 0;             % n of iterations for IRLS
@@ -262,17 +262,19 @@ end
 
 % Compute Weights
 w = zeros(length(t), 3);
-figure
+% figure % debug
 for i = 1:3 % E,N,U
     if doWeighting(i)
-        wFactor = -0.50;
+        wFactor = -0.5;
         twS  = 0; % rel. time to ts 
         twN = 2; % [years]
         wNo = 1;    % default weight
-        wEq = 10;       % weight at t=t_ts
+        wEq = 3;       % weight at t=t_ts
         w(:,i) = wNo;
         tTs = unique( tsLUT{i}.time );
         
+        figure % debug
+        %         subplot(3,1,i) % debug
         for j = 1:length( tTs ) % Loop Transients
             twSta = [twS; wEq];
             twMid = [twS + (twN-twS)*0.5 ; wNo + (wEq-wNo)*0.5];
@@ -295,12 +297,16 @@ for i = 1:3 % E,N,U
             wx = interp1(wLine(1,:), wLine(2,:), dt, 'pchip', NaN);
             wxIdx = ~isnan(wx);
             w( wxIdx,i ) = wx( wxIdx );
+            
+            plot(t,w(:,i)) % debug
+            hold on % debug
+            plot([twMid(1)+tTs(j) twPivot(1)+tTs(j)],[twMid(2) twPivot(2)], 'r'); % debug
+            plot(twSta(1)+tTs(j), twSta(2), 'gx') % debug
+            plot(twMid(1)+tTs(j), twMid(2), 'gx') % debug
+            plot(twMid(1)+tTs(j), twMid(2), 'gx') % debug
         end
-        subplot(3,1,i) % debug
-        plot(t,w(:,i)) % debug
-        hold on % debug
-        plot([twMid(1) twPivot(1)],[twMid(2) twPivot(2)], 'r'); % debug
-        plot(wLine(1,:), wLine(2,:), 'gx') % debug
+
+        
         grid on % debug
         ylabel('weight') % debug
         xlabel('t') % debug
@@ -380,7 +386,7 @@ for i = 1:3 % E-N-U
 end
 
 %% Mapping&Parameter Optimization (DHS/IP)
-restartScale = 0.01; %
+restartScale = 0.1; %
 tol = 0.001;
 for i = 1:3 % E-N-U
     tauArray = cell2mat(tauCell{i});
@@ -411,7 +417,7 @@ for i = 1:3 % E-N-U
         c.Label.String = 'RMS[mm]';
         xlim([min(tauVec1) , max(tauVec1)])
         ylim([min(tauVec2) , max(tauVec2)])
-        hold off
+        hold on
     end
     
     % function to calculate points
@@ -461,6 +467,7 @@ for i = 1:3 % E-N-U
             % DHS (custom method)
             [xMin, fxMin(i),nFnCalls(i),nRestarts(i),~] = ...
                 dhscopt(optFun, x0{i}', steps{i}', lLim{i}', uLim{i}', tol, restartScale, false);
+            hold off
         elseif j == 3
             % MATLAB method
             if ~isempty(x0{i})
