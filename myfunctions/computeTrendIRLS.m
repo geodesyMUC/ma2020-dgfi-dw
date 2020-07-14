@@ -51,13 +51,16 @@ nCoord = size(x,1);
 nB = size(x,2);
 A = zeros( nnz(x) , sum(polynDeg)+nCoord + length(osc)*2*nCoord + numel(j_t) + numel(ts_t) );
 nxEst = 0;
+nxEstStor = zeros( nCoord+1 , 1);
 for i = 1:nCoord
     j = (i-1)*nB + 1;
     k = nxEst + 1;
-    nxEst = nxEst + polynDeg(i) + 1 + length(osc)*2 + size(j_t,2) + size(ts_t,2);
+    nxEst = nxEst + polynDeg(i)+1 + length(osc)*2 + size(j_t,2) + size(ts_t,2);
+    nxEstStor(i+1) = nxEst;
     A( j:nB*i , k:nxEst ) = createCoeffMat(x(i,:), polynDeg(i), osc, j_t(i,:), ts_t(i,:), tau, tsType(i, :), doTsOverlay);
 end
-% timestamps, measurements, weights
+
+% timestamps, measurements, weights reshape
 x = x';
 x = x(:);
 
@@ -77,17 +80,17 @@ else
 end
 %% (2) Detect & Remove outliers
 % check if outliers are present
-outlierLogical = abs(e) > mean(e) + std(e) * outl_factor; % Logical with outliers
+outlierLogical = abs(e) > ( mean(e) + std(e)*outl_factor ); % Logical with outliers
 
 % if so, then remove outliers and compute LSE one more time
 if nnz(outlierLogical) > 0
-    b(outlierLogical) = []; % remove them from observation vector b
+    b(outlierLogical)    = []; % remove them from observation vector b
     A(outlierLogical, :) = []; % remove them from design matrix A
     % LS one more time
     [xEst, e] = computeLeastSquares(A, b);
 end
 
-% compute errors
+%% compute errors
 rms  = computeRMS(b - A*xEst);
 wrms = computeWRMS(b - A*xEst, w); % weights 1 (diag matrix)
 
@@ -170,6 +173,23 @@ results{6, 2} = rms2y;
 if doLog;fprintf('WMRS = %.4f, RMS = %.4f\n', wrms, rms);end
 
 y = A * xEst; % time series - trend
+xEst = xEst'; % return row
+if nCoord > 1
+    % preallocate
+    [xEst_,  y_] = deal( cell(nCoord, 1) );
+    % assign output to cells if nCoord is larger than 1
+    outlierLogical = reshape( outlierLogical , [nB, nCoord] );
+    outlierSum     = sum( ~outlierLogical ); % n of inliers
+    outlierSum     = [0, outlierSum];
+    for i = 1:nCoord
+        outlierSum(i+1) = outlierSum(i)+outlierSum(i+1); % cumulative sum
+        % part and reassign
+        xEst_{i} = xEst( nxEstStor(i)+1 : nxEstStor(i+1) );
+        y_{i}   = y( outlierSum(i)+1 : outlierSum(i+1) );
+    end
+    y = y_;
+    xEst = xEst_;
+end
 end
 
 %% Functions

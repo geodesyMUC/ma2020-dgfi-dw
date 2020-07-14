@@ -51,15 +51,15 @@ doStaticFile = true;
 
 % stationName = '21701S007A03'; % KSMV %[ok]
 % stationName = '21702M002A07'; % MIZU %[ok]
-stationName = '21729S007A04'; % USUDA %[ok]
-% stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
+% stationName = '21729S007A04'; % USUDA %[ok]
+stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
 % stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
 % stationName = '41719M004A02'; % Concepcion %[ok]
 
 %%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-polynDeg = [1, 1, 1];% Polynomial Trend,Integer Degree, Range [-1..3]
+polynDeg = [1, -1, -1];% Polynomial Trend,Integer Degree, Range [-1..3]
 % periods / oscillations in YEARS (=365.25 days) in vector form
 osc = {[0.5 1], [0.5 1], [0.5 1]};     % common values: 0.5y, 1y
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
@@ -68,12 +68,13 @@ doEQjump    = [true true true]; % E-N-U
 doRemoveTs = true; % global
 doTsOverlay = false; % global
 doWeighting = [false false false];
+estimationOpt = 2; % 1: E-N-U , 2: E&N-U , 3: E&N&U
 tarFct = 'rms';
 
 % specify type of transient: "log","exp","nil"
 transientType = {...
     'log','log'; ...    % coordinate1:E|X
-    'exp','exp'; ...    % coordinate2:N|Y
+    'log','log'; ...    % coordinate2:N|Y
     'log','log'};       % coordinate3:U|Z
 
 % Parameter tau in [years] for computation of logarithmic transient for
@@ -85,7 +86,7 @@ tauVec2 = years(days(250:30:730));
 
 % optimization constraints for transient 1 and transient 2 [years]
 lowLimit = [ 1/365.25, 250/365.25];
-uppLimit = [200/365.25, 5];
+uppLimit = [200/365.25, 8];
 
 % Additional Parameters for LSE/IRLSE
 KK = 0;             % n of iterations for IRLS
@@ -211,7 +212,6 @@ result_parameters = cell(3, 2);
 outlier_logicals  = cell(3, 1);
 outlier_logicals  = cellfun(@(x) zeros(length(t), 1), outlier_logicals, 'UniformOutput', false); % workaround for no outliers
 
-% Grid Search
 % generate tau vector for transients containing all combinations of values
 tsFctStr = {'log','exp'}; % used to verify user input string
 tauCell = cell(3,1);
@@ -260,7 +260,7 @@ for i = 1:3 % E-N-U
     nTransients(i) = nEq(i) * nTau(i); % Only EQ Jumps -> n of transients
 end
 
-% Compute Weights
+%% Compute Weights
 w = zeros(length(t), 3);
 % figure % debug
 for i = 1:3 % E,N,U
@@ -324,178 +324,272 @@ for i = 1:3 % E-N-U
     fxResAll{i} = zeros( size(tauCell{i},1) , 1 );
 end
 
+%% Set up Parameter Estimation Model for Grid Search
+switch estimationOpt
+    case 1 % E-N-U
+        [params, computationName] = deal( cell(3,1) );
+        for i = 1:3 % E-N-U
+            params{i} = getParameterModel(KK, p, outlFactor, t', data{:,2+i}', ...
+                polynDeg(i), oscW{i}, heavJumps{i}', ...
+                tsLUTgs{i}.time', tsLUTgs{i}.type', w(:,i)');
+            computationName{i} = coordinateName{i};
+        end
+        
+    case 2 % E&N-U
+        if any( size(heavJumps{1}) ~= size(heavJumps{2}) )
+            error('main: set up input parameter error: dim mismatch for heavJumps')
+        elseif any( size(tsLUTgs{1}.time) ~= size(tsLUTgs{2}.time) )
+            error('main: set up input parameter error: dim mismatch for ts times')
+        elseif any( size(tsLUTgs{1}.type) ~= size(tsLUTgs{2}.type) )
+            error('main: set up input parameter error: dim mismatch for ts types')
+        end
+        % E,N
+        params{1} = getParameterModel(KK, p, outlFactor, [t,t]', [data{:,3}, data{:,4}]', ...
+            [polynDeg(1); polynDeg(2)], oscW{1}, [heavJumps{1}, heavJumps{2}]', ...
+            [tsLUTgs{1}.time, tsLUTgs{2}.time]', [tsLUTgs{1}.type, tsLUTgs{2}.type]', [w(:,1), w(:,2)]');
+        computationName{1} = [coordinateName{1}, ' & ', coordinateName{2}];
+        
+        % U
+        params{2} = getParameterModel(KK, p, outlFactor, t', data{:,5}', ...
+            polynDeg(3), oscW{3}, heavJumps{3}', ...
+            tsLUTgs{3}.time', tsLUTgs{3}.type', w(:,3)');
+        computationName{2} = coordinateName{3};
+    case 3 % E&N&U
+        if any( size(heavJumps{1}) ~= size(heavJumps{2}) ) || any( size(heavJumps{2}) ~= size(heavJumps{3}) )
+            error('main: set up input parameter error: dim mismatch for heavJumps')
+        elseif any( size(tsLUTgs{1}.time) ~= size(tsLUTgs{2}.time) ) || any( size(tsLUTgs{2}.time) ~= size(tsLUTgs{3}.time) )
+            error('main: set up input parameter error: dim mismatch for ts times')
+        elseif any( size(tsLUTgs{1}.type) ~= size(tsLUTgs{2}.type) ) || any( size(tsLUTgs{2}.type) ~= size(tsLUTgs{3}.type) )
+            error('main: set up input parameter error: dim mismatch for ts types')
+        end
+        % E,N,U
+        params{1} = getParameterModel(KK, p, outlFactor, [t,t,t]', [data{:,3}, data{:,4}, data{:,5}]', ...
+            [polynDeg(1); polynDeg(2); polynDeg(3)], ...
+            oscW{1}, ...
+            [heavJumps{1}, heavJumps{2}, heavJumps{3}]', ...
+            [tsLUTgs{1}.time, tsLUTgs{2}.time, tsLUTgs{3}.time]', ...
+            [tsLUTgs{1}.type, tsLUTgs{2}.type, tsLUTgs{3}.type]', ...
+            [w(:,1), w(:,2), w(:,3)]' );
+        computationName{1} = [coordinateName{1}, ' & ', coordinateName{2},' & ', coordinateName{3}];
+    otherwise 
+        error('main: set up input parameter error: invalid value for estimationOpt')
+        
+end
+
 %% Parameter Estimation (Grid Search)
-params.t        = t';                    % timestamps [years], must be sorted
-params.kk       = KK;                   % n of iterations for IRLS
-params.p        = p;                    % L_p Norm for IRLS
-params.outl     = outlFactor;           % median(error) + standard deviation * factor -> outlier
-for i = 1:3 % E-N-U
-    params.b        = data{:,i+2}';      % vector with metric (coordinate)
-    params.poly     = polynDeg(i);      % integer polynome degree
-    params.o        = oscW{i};          % periods [angular velocity]
-    params.jt       = heavJumps{i};     % jump timestamps [years] relative to t0
-    params.tst      = tsLUTgs{i}.time';  % eq transients: time in years since t0
-    params.tstype   = tsLUTgs{i}.type';  % type (function) of tau (log|exp)
-    params.w        = w(:,i);
+nComp = length(params); % n of computations
+iRes = 1;               % count for processed coordinate components
+for i = 1:nComp % E-N-U, E&N-U, E&N&U
     fxRes = zeros( size(tauCell{i},1) , 1 ); % preallocate
     
     % tau value combination loop (grid search)
     for j = 1:length(tauCell{i})
         % The following parameter tau need to be repeated for each transient or eq
         % to satisfy LS Input req.
-        params.tau = ...
+        params{i}.tau = ...
             repmat( tauCell{i}{j} , [1,nEq(i)] ); % transient parameter tau
         
-        fprintf('LS for "%s" (%d of %d), tau=[%s\b] ...\n', ...
-            coordinateName{i}, j, length(tauCell{i}), ...
-            sprintf('%.4f ', tauCell{i}{j} ));
-        
-        [~, result_parameterC, ~, ~] = computeTrendIRLS( params, doTsOverlay ); % LS
+        [~, result_parameterC, ~, ~] = computeTrendIRLS( params{i}, doTsOverlay ); % LS
         fxRes(j) = result_parameterC{ strcmp(result_parameterC(:,1), tarFct) , 2};
         fxResAll{i}(j) = result_parameterC{ strcmp(result_parameterC(:,1), tarFct) , 2};
+        
+        fprintf('LS for "%s" (%d of %d), tau=[%s\b], rms=%.4f ...\n', ...
+            computationName{i}, j, length(tauCell{i}), ...
+            sprintf('%.4f ', tauCell{i}{j} ), fxRes(j));
     end
     [~, minIdx] = min( fxRes ); % minimization min( f(x) )
     minIdx = minIdx(1);         % prevent duplicates
+
+    params{i}.tau = repmat( tauCell{i}{minIdx} , [1,nEq(i)] ); % optimum for tau
+    [~, result_parameterC, xEst, ~] = computeTrendIRLS( params{i}, doTsOverlay ); % LS: get parameters
     
-    params.tau = repmat( tauCell{i}{minIdx} , [1,nEq(i)] );       % optimum tau
-    [~, result_parameterC, xEst, ~] = computeTrendIRLS( params, doTsOverlay ); % LS: get parameters
-    
-    optP = getParamStruct([result_parameterC{1,2}, result_parameterC{2,2}, xEst'],...
-        2, nPolynTerms(i), nOscParam(i), nJumps(i), nTransients(i));
-    
-    optY = TimeFunction(... % calculate points
-        t, ...
-        optP.polyn, ...
-        optP.oscil, ... % rearranged oscillation amplitudes (cosine, sine)
-        osc{i}, ...                      % periods
-        heavJumps{i}, ...
-        optP.jumps, ...
-        params.tst, ...
-        optP.tsamp, ...
-        repmat( tauCell{i}{minIdx} , [1,nEq(i)] ), ...
-        params.tstype, ...
-        doTsOverlay ...
-        );
-    
-    resStor{i}(1).trend = optY;
-    resStor{i}(1).error = result_parameterC;
-    resStor{i}(1).optp  = optP;
-    resStor{i}(1).optx  = tsLUTgs{i};
-    resStor{i}(1).model = params;
-    
+    for j = 1:size(xEst,1)      % loop cells returned from LS
+        if iscell(xEst)
+            paramsEst = xEst{j}; % more than 1 component
+        else
+            paramsEst = xEst;    % exactly 1 component
+        end
+        optP = getParamStruct([result_parameterC{1,2}, result_parameterC{2,2}, paramsEst],...
+            2, nPolynTerms(iRes), nOscParam(iRes), nJumps(iRes), nTransients(iRes));
+        inputParams = getIdxParameterModel( params{i},j );
+        
+        optY = TimeFunction(... % calculate points
+            inputParams.t, ...
+            optP.polyn, ...
+            optP.oscil, ...   % rearranged oscillation amplitudes (cosine, sine)
+            inputParams.o, ...  % periods (global)
+            inputParams.jt, ... % jump times
+            optP.jumps, ...
+            inputParams.tst, ...
+            optP.tsamp, ...
+            repmat( tauCell{iRes}{minIdx} , [1,nEq(iRes)] ), ... % opt tau (global)
+            inputParams.tstype, ...
+            doTsOverlay ...
+            );
+        
+        resStor{iRes}(1).trend = optY;
+        resStor{iRes}(1).error = result_parameterC;
+        resStor{iRes}(1).optp  = optP;
+        resStor{iRes}(1).optx  = tsLUTgs{iRes};
+        resStor{iRes}(1).model = inputParams;
+        
+        iRes = iRes+1; % increment coordinate component counter
+    end
 end
 
 %% Mapping&Parameter Optimization (DHS/IP)
-restartScale = 0.1; %
-tol = 0.001;
-for i = 1:3 % E-N-U
-    tauArray = cell2mat(tauCell{i});
-    lLim{i}  = tsLUT{i}{:,'lBound'};
-    uLim{i}  = tsLUT{i}{:,'uBound'};
-    x0{i}    = tsLUT{i}{:,'lBound'}+1e-3;
-    steps{i} = tsLUT{i}{:,'uBound'}-tsLUT{i}{:,'lBound'}; % if max(tauArray)==inf?
+switch estimationOpt
+    case 1 % E-N-U
+        [lLim, uLim, x0, steps] = deal( cell(3,1) );
+        for i = 1:3 % E-N-U
+            params{i}.tst    = tsLUT{i}{:,'time'}';
+            params{i}.tstype = tsLUT{i}{:,'type'}';
+            
+            lLim{i}  = tsLUT{i}{:,'lBound'};
+            uLim{i}  = tsLUT{i}{:,'uBound'};
+            x0{i}    = tsLUT{i}{:,'lBound'}+1e-3;
+            % steps for DHS init simplex,undefined for ts uBound==inf
+            steps{i} = tsLUT{i}{:,'uBound'} - tsLUT{i}{:,'lBound'}; 
+        end
+    case 2 % E&N-U
+        % E,N
+        params{1}.tst    = [tsLUT{1}{:,'time'}, tsLUT{2}{:,'time'}]';
+        params{1}.tstype = [tsLUT{1}{:,'type'}, tsLUT{2}{:,'type'}]';
+        % U
+        params{2}.tst    = [ tsLUT{3}{:,'time'} ]';
+        params{2}.tstype = [ tsLUT{3}{:,'type'} ]';
+        % E&N transients get assigned limits from first transient in LUT
+        % -> they should be equal
+        lLim{1}  = tsLUT{1}{:,'lBound'};
+        uLim{1}  = tsLUT{1}{:,'uBound'};
+        x0{1}    = tsLUT{1}{:,'lBound'}+1e-3;
+        % steps for DHS init simplex,undefined for ts uBound==inf
+        steps{1} = tsLUT{1}{:,'uBound'}-tsLUT{i}{:,'lBound'};
+        
+        lLim{2}  = tsLUT{3}{:,'lBound'};
+        uLim{2}  = tsLUT{3}{:,'uBound'};
+        x0{2}    = tsLUT{3}{:,'lBound'}+1e-3;
+        % steps for DHS init simplex,undefined for ts uBound==inf
+        steps{2} = tsLUT{3}{:,'uBound'}-tsLUT{i}{:,'lBound'};
+        
+    case 3 % E&N&U
+        % E,N,U
+        params{1}.tst    = [tsLUT{1}{:,'time'}, tsLUT{2}{:,'time'}, tsLUT{3}{:,'time'}]';
+        params{1}.tstype = [tsLUT{1}{:,'type'}, tsLUT{2}{:,'type'}, tsLUT{3}{:,'type'}]';
+        % E&N&U transients get assigned limits from first transient in LUT
+        % -> they should be equal
+        lLim{1}  = tsLUT{1}{:,'lBound'};
+        uLim{1}  = tsLUT{1}{:,'uBound'};
+        x0{1}    = tsLUT{1}{:,'lBound'}+1e-3;
+        % steps for DHS init simplex,undefined for ts uBound==inf
+        steps{1} = tsLUT{1}{:,'uBound'}-tsLUT{i}{:,'lBound'};
+        
+    otherwise
+        error('main: set up input parameter error: invalid value for estimationOpt (dhs,ip)')
 end
 
+restartScale = 0.1; %
+tol = 0.001;
+
+
 % create map plot for tau & optimization
-for i = 1:3 % E-N-U
-    if size(tauCell{i}{1},2) == 1 % 1 tau
-        figure
-        plot(days(years( cell2mat(tauCell{i}) )) , fxResAll{i}(:) )
-        xlabel('\tau_{log} [days]')
-        ylabel('rms [mm]')
-        title(["\tau parameter space for ", coordinateName{i}])
-    elseif size(tauCell{i}{1},2) == 2 && length(tauVec1)>1 && length(tauVec2)>1  % 2 tau
-        resultGrid = reshape(fxResAll{i}(:,1), length(tauVec2), length(tauVec1) );
-        figure
-        colormap(flipud(parula)) % low error = good
-        % contourf(days(years(tauVec1)),days(years(tauVec2)),resultGrid);
-        contourf(tauVec1,tauVec2,resultGrid);
-        xlabel('\tau_{log1}SHORT [y]')
-        ylabel('\tau_{log2}LONG [y]')
-        title(["\tau parameter space for ", coordinateName{i}])
-        c = colorbar;
-        c.Label.String = 'RMS[mm]';
-        xlim([min(tauVec1) , max(tauVec1)])
-        ylim([min(tauVec2) , max(tauVec2)])
-        hold on
-    end
-    
-    % function to calculate points
-    timeFn = @(a, b, c, d, e) TimeFunction(...
-        t, ...
-        a, ...                  % polynome term coefficients
-        b, ... % rearranged oscillation amplitudes (cosine, sine)
-        osc{i}, ...             
-        heavJumps{i}, ...
-        c, ...                  % heaviside jumps
-        tsLUT{i}{:,'time'}, ...
-        d, ...                  % amplitudes
-        e,...                   % tau
-        tsLUT{i}{:,'type'}, ...
-        doTsOverlay ...
-        );
-    
-    % optimization default parameters
-    params.b        = data{:,i+2};  % vector with metric (coordinate)
-    params.poly     = polynDeg(i);  % polynome degree
-    params.o        = oscW{i};      % periods
-    params.jt       = heavJumps{i}; % jumps: time in years relative to t0
-    params.tst      = tsLUT{i}{:,'time'}';% eq transients: time in years since t0
-    params.tstype   = tsLUT{i}{:,'type'}';  % type (function) of tau (log|exp)
-    params.w        = w(:,i); % weights
-    
-    % function for optimization
-    optFun = @(x) getTrendError(...
-        params.t, ...     % t in years where t0=beginning of TS
-        params.b, ...     % vector with metric (coordinate)
-        params.w, ...     % weights
-        params.poly, ...  % polynome degree
-        params.o, ...     % periods
-        params.jt, ...    % jumps: time in years since t0
-        params.tst, ...   % eq transients: time in years since t0
-        x, ...            % transient parameter tau
-        params.tstype,... % type (function) of tau 2(log|exp)
-        params.kk, ...    % n of iterations for IRLS
-        params.p, ...     % L_p Norm for IRLS
-        params.outl,...   % median(error) + standard deviation * factor -> outlier );
-        doTsOverlay, ...  % overlay flag
-        tarFct ...        % name of target fct for optimization
-        );
-    
-    for j = 2:3 % dhs-ip
-        if j == 2
-            % DHS (custom method)
-            [xMin, fxMin(i),nFnCalls(i),nRestarts(i),~] = ...
-                dhscopt(optFun, x0{i}', steps{i}', lLim{i}', uLim{i}', tol, restartScale, false);
-            hold off
-        elseif j == 3
-            % MATLAB method
-            if ~isempty(x0{i})
-                options = optimoptions(@fmincon,...
-                    'Display','iter','Algorithm','interior-point');
-                [xMin,fxMin_{i}] = fmincon(optFun,x0{i},...
-                    [],[],[],[],lLim{i},uLim{i},[],options);
-            else
-                xMin = [];
-            end
+for j = 2:3 % dhs-ip
+    iRes = 1;
+    for i = 1:nComp % E-N-U, E&N-U, E&N&U
+        
+        if  j == 2 && size(tauCell{i}{1},2) == 1% 1 tau
+            figure
+            plot(days(years( cell2mat(tauCell{i}) )) , fxResAll{i}(:) )
+            xlabel('\tau_{log} [days]')
+            ylabel('rms [mm]')
+            title(["\tau parameter space for ", computationName{i}])
+        elseif  j == 2 && size(tauCell{i}{1},2) == 2 && length(tauVec1)>1 && length(tauVec2)>1  % 2 tau
+            resultGrid = reshape(fxResAll{i}(:,1), length(tauVec2), length(tauVec1) );
+            figure
+            colormap(flipud(parula)) % low error = good
+            % contourf(days(years(tauVec1)),days(years(tauVec2)),resultGrid);
+            contourf(tauVec1,tauVec2,resultGrid);
+            xlabel('\tau_{log1}SHORT [y]')
+            ylabel('\tau_{log2}LONG [y]')
+            title(["\tau parameter space for ", computationName{i}])
+            c = colorbar;
+            c.Label.String = 'RMS[mm]';
+            xlim([min(tauVec1) , max(tauVec1)])
+            ylim([min(tauVec2) , max(tauVec2)])
+            hold on
+        end
+                
+        % function for optimization
+        optFun = @(x) getTrendError(...
+            params{i}.t, ...     % t in years where t0=beginning of TS
+            params{i}.b, ...     % vector with metric (coordinate)
+            params{i}.w, ...     % weights
+            params{i}.poly, ...  % polynome degree
+            params{i}.o, ...     % periods
+            params{i}.jt, ...    % jumps: time in years since t0
+            params{i}.tst, ...   % eq transients: time in years since t0
+            x, ...            % transient parameter tau
+            params{i}.tstype,... % type (function) of tau 2(log|exp)
+            params{i}.kk, ...    % n of iterations for IRLS
+            params{i}.p, ...     % L_p Norm for IRLS
+            params{i}.outl,...   % median(error) + standard deviation * factor -> outlier );
+            doTsOverlay, ...  % overlay flag
+            tarFct ...        % name of target fct for optimization
+            );
+        
+        switch j
+            case 2
+                % DHS (custom method)
+                [xMin, fxMin(i),nFnCalls(i),nRestarts(i),~] = ...
+                    dhscopt(optFun, x0{i}', steps{i}', lLim{i}', uLim{i}', tol, restartScale, false);
+                hold off
+            case 3
+                % MATLAB method
+                if ~isempty(x0{i})
+                    options = optimoptions(@fmincon,...
+                        'Display','iter','Algorithm','interior-point');
+                    [xMin,fxMin_{i}] = fmincon(optFun,x0{i},...
+                        [],[],[],[],lLim{i},uLim{i},[],options);
+                else
+                    xMin = [];
+                end
         end
         
-        params.tau = xMin; % set transient parameters tau
-        [~, result_parameterC, xEst, ~] = computeTrendIRLS( params, doTsOverlay ); % get parameters
-        optP = getParamStruct([result_parameterC{1,2}, result_parameterC{2,2}, xEst'], ...
-            2, nPolynTerms(i), nOscParam(i), nJumps(i), length(xMin));
-        optY = timeFn(...
-            optP.polyn, ...
-            optP.oscil, ...
-            optP.jumps, ...
-            optP.tsamp, ...
-            xMin);
-        % store in result struct
-        resStor{i}(j).optp  = optP;
-        resStor{i}(j).error = result_parameterC;
-        resStor{i}(j).trend = optY;
-        resStor{i}(j).optx  = tsLUT{i};
-        resStor{i}(j).model = params;
+        params{i}.tau = xMin; % set transient parameters opt tau
+        [~, result_parameterC, xEst, ~] = computeTrendIRLS( params{i}, doTsOverlay ); % get parameters
+        
+        for k = 1:size(xEst,1)      % loop cells returned from LS
+            if iscell(xEst)
+                paramsEst = xEst{k};
+            else
+                paramsEst = xEst;
+            end
+            optP = getParamStruct([result_parameterC{1,2}, result_parameterC{2,2}, paramsEst],...
+                2, nPolynTerms(iRes), nOscParam(iRes), nJumps(iRes), length(tsLUT{iRes}.time));
+            inputParams = getIdxParameterModel( params{i},k );
+            
+            optY = TimeFunction(...     % calculate points:
+                inputParams.t, ...
+                optP.polyn, ...
+                optP.oscil, ...         % rearranged oscillation amplitudes (cosine, sine)
+                inputParams.o, ...      % periods (global)
+                inputParams.jt, ...     % jump times
+                optP.jumps, ...
+                inputParams.tst, ...
+                optP.tsamp, ...
+                xMin, ...               % opt tau (global)
+                inputParams.tstype, ...
+                doTsOverlay ...
+                );
+            
+            resStor{iRes}(j).trend = optY;
+            resStor{iRes}(j).error = result_parameterC;
+            resStor{iRes}(j).optp  = optP;
+            resStor{iRes}(j).optx  = tsLUT{iRes};
+            resStor{iRes}(j).model = inputParams;
+            
+            iRes = iRes+1; % increment coordinate component counter
+        end
     end
 end
 
@@ -641,6 +735,50 @@ res.tsamp = getParam(params, s(4), s(5)-1 );
     end
 end
 
+function res = getParameterModel(kk, p, outl, t, b, poly, o, jt, tst, tstype, w)
+res.kk       = kk;      % n of iterations for IRLS
+res.p        = p;       % L_p Norm for IRLS
+res.outl     = outl;    % median(error) + standard deviation * factor -> outlier
+
+% schema: rows are coordinates. 1 row = 1 coordinate, 2 rows = 2 c., ...
+res.t        = fixRowCol( t );       % timestamps [years], must be sorted
+res.b        = fixRowCol( b );       % vector with metric (coordinate)
+res.poly     = poly;                 % integer polynome degree
+res.o        = o;                    % periods [angular velocity]
+res.jt       = jt;                   % jump timestamps [years] relative to t0
+res.tst      = tst;                  % eq transients: time in years since t0
+res.tstype   = tstype;               % type (function) of tau (log|exp)
+res.w        = fixRowCol( w );       % weights
+
+    function out = fixRowCol(in)
+        if size(in,1) > size(in,2)
+            out = in';
+        else
+            out = in;
+        end
+    end
+end
+
+function out = getIdxParameterModel(in, idx)
+% INDEX: local=per coordinate, NO INDEX: global
+out.kk       = in.kk;      % n of iterations for IRLS: NO INDEX
+out.p        = in.p;       % L_p Norm for IRLS: NO INDEX
+out.outl     = in.outl;    % median(error) + standard deviation * factor -> outlier: NO INDEX
+
+% schema: rows are coordinates. 1 row = 1 coordinate, 2 rows = 2 c., ...
+out.t        = in.t(idx, :);                    % timestamps [years], must be sorted: INDEX
+out.b        = in.b(idx, :);                    % vector with metric (coordinate): INDEX
+out.poly     = in.poly(idx, :);                 % integer polynome degree: INDEX
+out.o        = in.o;                    % periods [angular velocity]: NO INDEX
+out.jt       = in.jt(idx, :);                   % jump timestamps [years] relative to t0: INDEX
+out.tst      = in.tst(idx, :);                  % eq transients: time in years since t0: INDEX
+out.tstype   = in.tstype(idx, :);               % type (function) of tau (log|exp): INDEX
+out.w        = in.w(idx, :);                    % weights: INDEX
+if isfield( in, 'tau')
+    out.tau      = in.tau;                          % tau: NO INDEX
+end
+end
+
 function out = getTrendError(x, b, w, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay, tarFct)
 [~,results,~,~] = computeTrendIRLS(x, b, w, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay);
 if isempty(strcmp(x, tarFct))
@@ -648,3 +786,4 @@ if isempty(strcmp(x, tarFct))
 end
 out = results{cellfun(@(x) strcmp(x,tarFct), results(:,1)),2};
 end
+
