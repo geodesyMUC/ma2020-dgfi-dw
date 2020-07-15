@@ -1,4 +1,4 @@
-function [] = writeOutputLog(fID, station, cnName, polyn, osc, jump, t_ts, tsAmp, tsTau, errors)
+function [] = writeOutputLog(fID, station, cnName, polyn, osc, jump, t_ts, tsAmp, tsTau, outl, errors)
 %writeOutputLog writes output parameters to a formatted log file
 %   fID: log file identifier
 %   ts_name: Name of Time Series
@@ -7,8 +7,7 @@ function [] = writeOutputLog(fID, station, cnName, polyn, osc, jump, t_ts, tsAmp
 %   P: vector containing periods in [YEARS]
 %   HJumps: vector containing jump times in [SECONDS] relative to t0 (if not specified -> empty)
 %   EQJump: vector containing jump times for earthquakes in [SECONDS] relative to t0 (if not specified -> empty)
-%   rms: estimated root mean square
-%   wrms: estimated weighted root mean square
+%   erros: key-value cell
 fprintf(fID, '## RESULTS: Station %s, Coordinate "%s" -----------------------------------\n', station, cnName);
 
 if ~isempty(polyn)
@@ -19,15 +18,18 @@ end
 fprintf(fID, '# Polynomial Coefficients\n%s\n', strP);
 
 if ~isempty(osc)
+    osc = reorderSinCos( osc ); % S*cos(wt), C*sin(wt)
     strO = '';
     for i = 1:size(osc,2)
-        strONew = sprintf('%.3f; %.3f\n', osc(:,i));
+        strONew = sprintf('%.3f; %.3f; %.3f; %.3f\n', osc(:,i), ...
+            sqrt(osc(1,i)^2+osc(2,i)^2), ...
+            atan( osc(1,i)/osc(2,i) )  );
         strO = [strO strONew];
     end
 else
     strO = sprintf('%s\n', 'none estimated');
 end
-fprintf(fID, '# Oscillation Amplitude Components (cosine; sine)\n%s\n', strO);
+fprintf(fID, '# Oscillation Amplitude Components (S; C; A; phase shift)\n%s\n', strO);
 
 if ~isempty(jump)
     strJ = sprintf('%.3f\n', jump);
@@ -62,6 +64,11 @@ else
     strT = sprintf('%s\n', 'none estimated');
 end
 fprintf(fID, '# Transient Amplitudes\n%s\n', strT);
+
+% outliers
+strOutl = sprintf('%d\n', sum(outl) );
+fprintf(fID, '# Outliers (number of measurements removed)\n%s\n', strOutl);
+
 % errors
 fprintf(fID, '# Error metrics\n');
 for i = 1:size(errors,1)

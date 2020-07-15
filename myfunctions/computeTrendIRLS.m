@@ -83,9 +83,10 @@ end
 outlierLogical = abs(e) > ( mean(e) + std(e)*outl_factor ); % Logical with outliers
 
 % if so, then remove outliers and compute LSE one more time
-if nnz(outlierLogical) > 0
+if outl_factor < 100 && nnz(outlierLogical) > 0
     b(outlierLogical)    = []; % remove them from observation vector b
     A(outlierLogical, :) = []; % remove them from design matrix A
+    w(outlierLogical)    = []; % remove them from weight vector w
     % LS one more time
     [xEst, e] = computeLeastSquares(A, b);
 end
@@ -188,8 +189,9 @@ if nCoord > 1
         y_{i}   = y( outlierSum(i)+1 : outlierSum(i+1) );
     end
     y = y_;
-    xEst = xEst_;
+    xEst = xEst_;    
 end
+outlierLogical = outlierLogical'; % components -> rows, obs -> columns
 end
 
 %% Functions

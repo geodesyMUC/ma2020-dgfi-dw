@@ -1,4 +1,4 @@
-function VisualizeResiduals(t_res, res, obs_outlier_logical, obs_names, ...
+function VisualizeResiduals(t_res, res, outlierLogicals, obs_names, ...
     title_strings, t_jump, jump_categories_logical, jump_categories_names, jumpITRF)
 %VisualizeResiduals: Visualizes Trend Residuals.
 %   INPUT
@@ -46,19 +46,11 @@ for i = 1:n_components
     % Plot Residuals
     %     pRes = area(t_res, res(:, i), 'linestyle', 'none');
     %     pRes(1).FaceColor = [255 127 127]./255;
-    pRes = bar(t_res, res(:, i), 'edgecolor', 'none', 'facecolor', [255 127 127]./255);
+    pRes = bar(t_res( ~outlierLogicals{i} ), res( ~outlierLogicals{i} , i), 'edgecolor', 'none', 'facecolor', [255 127 127]./255);
     ylabel(sprintf('%s', obs_names{i}))
     xlim([min(t_res) max(t_res)])
     title(title_strings{i});
-    
-    % Plot Outliers if there are any
-    if nnz(obs_outlier_logical{i}) > 0
-        % Outlier
-        pOutl = plot(t_res(obs_outlier_logical{i}), res(obs_outlier_logical{i}, i), ...
-            '.', 'markersize', 8, ...
-            'Color', [255, 153, 0]./255);
-    end
-    
+
     ax = gca;
     y1 = ax.YLim(1); % axis MIN
     y2 = ax.YLim(2); % axis MAX
@@ -79,11 +71,6 @@ for i = 1:n_components
     plotLogical = false(3 + length(jump_categories_names), 1);
     plotLogical(1:2) = true; % observations, trend, itrf always in plot
     
-    if nnz(obs_outlier_logical{i}) > 0 % if outliers present, add to legend
-        plotLogical(3) = true;
-        my_legend_elements = [my_legend_elements, pOutl];
-    end
-    
     plotElement = cell(length(jump_categories_names), 1); % plot elements storage
     cnt = 1; % counter for plot elements
     % Plot Jumps
@@ -103,7 +90,7 @@ for i = 1:n_components
             end
         end
     end
-    all_plot_legend_names = [{'Residuals', 'new ITRF', 'Outlier'}, jump_categories_names];
+    all_plot_legend_names = [{'Residuals', 'new ITRF'}, jump_categories_names];
     my_plot_legend_names = all_plot_legend_names(plotLogical);
     
     % Add Legend

@@ -91,7 +91,7 @@ uppLimit = [200/365.25, 8];
 % Additional Parameters for LSE/IRLSE
 KK = 0;             % n of iterations for IRLS
 p = 1.0;            % L_p Norm for IRLS
-outlFactor = 100;   % median(error) + standard deviation * factor -> outlier
+outlFactor = 4;   % median(error) + standard deviation * factor -> outlier
 
 % other variables
 coordinateName    = {'E [mm]', 'N [mm]', 'U [mm]'}; % used to label plots
@@ -208,10 +208,6 @@ for i = 1:3 % E-N-U
         );
 end
 
-result_parameters = cell(3, 2);
-outlier_logicals  = cell(3, 1);
-outlier_logicals  = cellfun(@(x) zeros(length(t), 1), outlier_logicals, 'UniformOutput', false); % workaround for no outliers
-
 % generate tau vector for transients containing all combinations of values
 tsFctStr = {'log','exp'}; % used to verify user input string
 tauCell = cell(3,1);
@@ -326,10 +322,11 @@ end
 
 %% Set up Parameter Estimation Model for Grid Search
 switch estimationOpt
+    % outlier factor is first set to inf
     case 1 % E-N-U
         [params, computationName] = deal( cell(3,1) );
         for i = 1:3 % E-N-U
-            params{i} = getParameterModel(KK, p, outlFactor, t', data{:,2+i}', ...
+            params{i} = getParameterModel(KK, p, inf, t', data{:,2+i}', ...
                 polynDeg(i), oscW{i}, heavJumps{i}', ...
                 tsLUTgs{i}.time', tsLUTgs{i}.type', w(:,i)');
             computationName{i} = coordinateName{i};
@@ -344,13 +341,13 @@ switch estimationOpt
             error('main: set up input parameter error: dim mismatch for ts types')
         end
         % E,N
-        params{1} = getParameterModel(KK, p, outlFactor, [t,t]', [data{:,3}, data{:,4}]', ...
+        params{1} = getParameterModel(KK, p, inf, [t,t]', [data{:,3}, data{:,4}]', ...
             [polynDeg(1); polynDeg(2)], oscW{1}, [heavJumps{1}, heavJumps{2}]', ...
             [tsLUTgs{1}.time, tsLUTgs{2}.time]', [tsLUTgs{1}.type, tsLUTgs{2}.type]', [w(:,1), w(:,2)]');
         computationName{1} = [coordinateName{1}, ' & ', coordinateName{2}];
         
         % U
-        params{2} = getParameterModel(KK, p, outlFactor, t', data{:,5}', ...
+        params{2} = getParameterModel(KK, p, inf, t', data{:,5}', ...
             polynDeg(3), oscW{3}, heavJumps{3}', ...
             tsLUTgs{3}.time', tsLUTgs{3}.type', w(:,3)');
         computationName{2} = coordinateName{3};
@@ -363,7 +360,7 @@ switch estimationOpt
             error('main: set up input parameter error: dim mismatch for ts types')
         end
         % E,N,U
-        params{1} = getParameterModel(KK, p, outlFactor, [t,t,t]', [data{:,3}, data{:,4}, data{:,5}]', ...
+        params{1} = getParameterModel(KK, p, inf, [t,t,t]', [data{:,3}, data{:,4}, data{:,5}]', ...
             [polynDeg(1); polynDeg(2); polynDeg(3)], ...
             oscW{1}, ...
             [heavJumps{1}, heavJumps{2}, heavJumps{3}]', ...
@@ -399,9 +396,12 @@ for i = 1:nComp % E-N-U, E&N-U, E&N&U
     end
     [~, minIdx] = min( fxRes ); % minimization min( f(x) )
     minIdx = minIdx(1);         % prevent duplicates
-
-    params{i}.tau = repmat( tauCell{i}{minIdx} , [1,nEq(i)] ); % optimum for tau
-    [~, result_parameterC, xEst, ~] = computeTrendIRLS( params{i}, doTsOverlay ); % LS: get parameters
+    
+    % set transient parameters to opt(x)
+    params{i}.tau = repmat( tauCell{i}{minIdx} , [1,nEq(i)] );
+    params{i}.outl = outlFactor; % assign outlier factor to remove outliers
+    % LS: get parameters for opt(x)
+    [~, result_parameterC, xEst, isOutlier] = computeTrendIRLS( params{i}, doTsOverlay );
     
     for j = 1:size(xEst,1)      % loop cells returned from LS
         if iscell(xEst)
@@ -432,18 +432,20 @@ for i = 1:nComp % E-N-U, E&N-U, E&N&U
         resStor{iRes}(1).optp  = optP;
         resStor{iRes}(1).optx  = tsLUTgs{iRes};
         resStor{iRes}(1).model = inputParams;
+        resStor{iRes}(1).outl  = isOutlier(j,:);
         
         iRes = iRes+1; % increment coordinate component counter
     end
 end
 
-%% Mapping&Parameter Optimization (DHS/IP)
+%% Parameter Optimization Model (DHS/IP)
 switch estimationOpt
     case 1 % E-N-U
         [lLim, uLim, x0, steps] = deal( cell(3,1) );
         for i = 1:3 % E-N-U
             params{i}.tst    = tsLUT{i}{:,'time'}';
             params{i}.tstype = tsLUT{i}{:,'type'}';
+            params{i}.outl = inf;
             
             lLim{i}  = tsLUT{i}{:,'lBound'};
             uLim{i}  = tsLUT{i}{:,'uBound'};
@@ -455,9 +457,11 @@ switch estimationOpt
         % E,N
         params{1}.tst    = [tsLUT{1}{:,'time'}, tsLUT{2}{:,'time'}]';
         params{1}.tstype = [tsLUT{1}{:,'type'}, tsLUT{2}{:,'type'}]';
+        params{1}.outl = inf;
         % U
         params{2}.tst    = [ tsLUT{3}{:,'time'} ]';
         params{2}.tstype = [ tsLUT{3}{:,'type'} ]';
+        params{2}.outl = inf;
         % E&N transients get assigned limits from first transient in LUT
         % -> they should be equal
         lLim{1}  = tsLUT{1}{:,'lBound'};
@@ -476,6 +480,7 @@ switch estimationOpt
         % E,N,U
         params{1}.tst    = [tsLUT{1}{:,'time'}, tsLUT{2}{:,'time'}, tsLUT{3}{:,'time'}]';
         params{1}.tstype = [tsLUT{1}{:,'type'}, tsLUT{2}{:,'type'}, tsLUT{3}{:,'type'}]';
+        params{1}.outl = inf;
         % E&N&U transients get assigned limits from first transient in LUT
         % -> they should be equal
         lLim{1}  = tsLUT{1}{:,'lBound'};
@@ -491,8 +496,7 @@ end
 restartScale = 0.1; %
 tol = 0.001;
 
-
-% create map plot for tau & optimization
+%% create map plot for tau & optimization
 for j = 2:3 % dhs-ip
     iRes = 1;
     for i = 1:nComp % E-N-U, E&N-U, E&N&U
@@ -554,9 +558,11 @@ for j = 2:3 % dhs-ip
                     xMin = [];
                 end
         end
-        
-        params{i}.tau = xMin; % set transient parameters opt tau
-        [~, result_parameterC, xEst, ~] = computeTrendIRLS( params{i}, doTsOverlay ); % get parameters
+        % set transient parameters to opt(x)
+        params{i}.tau = xMin;
+        params{i}.outl = outlFactor; % assign outlier factor to remove outliers
+        % LS: get parameters for opt(x)
+        [~, result_parameterC, xEst, isOutlier] = computeTrendIRLS( params{i}, doTsOverlay );
         
         for k = 1:size(xEst,1)      % loop cells returned from LS
             if iscell(xEst)
@@ -587,7 +593,7 @@ for j = 2:3 % dhs-ip
             resStor{iRes}(j).optp  = optP;
             resStor{iRes}(j).optx  = tsLUT{iRes};
             resStor{iRes}(j).model = inputParams;
-            
+            resStor{iRes}(j).outl  = isOutlier(k,:);
             iRes = iRes+1; % increment coordinate component counter
         end
     end
@@ -601,12 +607,13 @@ else
 end
 
 for j = 1:3 % grid search-dhs-ip
-    if j == 1
-        method = 'gs';
-    elseif j == 2
-        method = 'dhs';
-    elseif j == 3
-        method = 'ip';
+    switch j
+        case 1
+            method = 'gs';
+        case 2
+            method = 'dhs';
+        case 3
+            method = 'ip';
     end
     % Write to File
     % Open Log File and get identifier
@@ -624,7 +631,8 @@ for j = 1:3 % grid search-dhs-ip
             resStor{i}(j).optp.jumps, ...
             resStor{i}(j).model.tst, ...
             resStor{i}(j).optp.tsamp, ...
-            resStor{i}(j).model.tau, ... 
+            resStor{i}(j).model.tau, ...
+            resStor{i}(j).outl, ...
             resStor{i}(j).error ...
             )
     end
@@ -663,7 +671,9 @@ for j = 1:3 % grid search-dhs-ip
     % visualize time series and results
     figTSA = figure;
     VisualizeTS_Trend_Outliers_ITRF_ENU(...
-        data{:, 'date'}, [data{:, 3}, data{:, 4}, data{:, 5}], outlier_logicals, coordinateName, ...
+        data{:, 'date'}, [data{:, 3}, data{:, 4}, data{:, 5}], ...
+        [{resStor{1}(j).outl}; {resStor{2}(j).outl}; {resStor{3}(j).outl}]', ...
+        coordinateName, ...
         tInterpol, [resStor{1}(j).trend, resStor{2}(j).trend, resStor{3}(j).trend], ...
         titleString, ...
         currStationJumps{:, 'Date'}, ...
@@ -675,13 +685,15 @@ for j = 1:3 % grid search-dhs-ip
     set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
     
     % visualize residuals
+    rsd(:,1) = data{:, 3}-resStor{1}(j).trend;
+    rsd(:,2) = data{:, 4}-resStor{2}(j).trend;
+    rsd(:,3) = data{:, 5}-resStor{3}(j).trend;
+    
     figRes = figure;
     VisualizeResiduals(...
-        data{:, 'date'}, [...
-        data{:, 3}-resStor{1}(j).trend, ... % E residuals
-        data{:, 4}-resStor{2}(j).trend, ... % N residuals
-        data{:, 5}-resStor{3}(j).trend], ...% U residuals
-        outlier_logicals, ...
+        data{:, 'date'}, ...
+        rsd, ...% residuals
+        [{resStor{1}(j).outl}; {resStor{2}(j).outl}; {resStor{3}(j).outl}]', ...
         cellfun(@(x) ['Residual \Delta',x],coordinateName,'UniformOutput',false), ...
         titleString, ...
         currStationJumps{:, 'Date'}, ...
