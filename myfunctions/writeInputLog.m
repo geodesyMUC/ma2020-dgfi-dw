@@ -14,9 +14,8 @@ function [] = writeInputLog(fID, stationname, coordinateName, t, polynDeg, P, HJ
 %   outl_factor: median(error)|mean(error) + standard deviation * factor -> outlier
 
 t0   = t(1);
-t_end = t(end);
 
-% header
+% input model header
 fprintf(fID, '## INPUT MODEL: Station %s, Coordinate "%s" ================================\n', stationname, coordinateName);
 % fprintf(fID, 'Time Series Start t_0: %s\n', datestr(t0, 'yyyy-mm-dd HH:MM'));
 % fprintf(fID, 'Time Series End t_end: %s\n\n', datestr(t_end, 'yyyy-mm-dd HH:MM'));

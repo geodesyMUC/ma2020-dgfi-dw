@@ -76,7 +76,9 @@ if w == ones(length(w),1)
     [xEst, e] = computeLeastSquares(A, b);
 else
     % WLS
-    [xEst, e] = computeWeightedLeastSquares(A, b, w);
+%     [xEst, e] = computeWeightedLeastSquares(A, b, w);
+    xEst = lscov(A,b,w); % MATLAB method
+    e = A*xEst - b;
 end
 %% (2) Detect & Remove outliers
 % check if outliers are present
@@ -201,12 +203,13 @@ function [xEst, e] = computeLeastSquares(A, b)
 % % Option 1 -----
 % Nmat = A'*A; % normal equations
 % n = A'*b;
-% xEst = Nmat\A'*b;
+% 
 
 % Option 2 ----- Pseudoinverse (Penrose-Moore)
 Nmat = A' * A; % normal equations
 n = A' * b;
 xEst = pinv(Nmat, 1e-8) * n;
+xEstx = Nmat\A'*b;
 
 % % Option 3 --- Use Function
 % xEst = lsqInvMMult(A' * A, A' * b);

@@ -52,9 +52,9 @@ doStaticFile = true;
 % stationName = '21701S007A03'; % KSMV %[ok]
 % stationName = '21702M002A07'; % MIZU %[ok]
 % stationName = '21729S007A04'; % USUDA %[ok]
-stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
+% stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
-% stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
+stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
 % stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
 % stationName = '41719M004A02'; % Concepcion %[ok]
 
@@ -67,8 +67,7 @@ doITRFjump  = [false false false]; % E-N-U
 doEQjump    = [true true true]; % E-N-U
 doRemoveTs = true; % global
 doTsOverlay = false; % global
-doWeighting = [false false false];
-estimationOpt = 2; % 1: E-N-U , 2: E&N-U , 3: E&N&U
+estimationOpt = 1; % 1: E-N-U , 2: E&N-U , 3: E&N&U
 tarFct = 'rms';
 
 % specify type of transient: "log","exp","nil"
@@ -80,13 +79,22 @@ transientType = {...
 % Parameter tau in [years] for computation of logarithmic transient for
 % earthquake events (jumps):
 % vector mapping different T (tau) relaxation coefficients [years]
-tauVec1 = years(days(1:20:200));
-tauVec2 = years(days(250:30:730));
+tauVec1 = years(days(1:5:50));
+tauVec2 = years(days(200:20:1000));
 % tauVec1 = years(days(1:5:365)); % full range tau
 
 % optimization constraints for transient 1 and transient 2 [years]
-lowLimit = [ 1/365.25, 250/365.25];
+lowLimit = [ 0.01/365.25, 250/365.25];
 uppLimit = [200/365.25, 8];
+
+% weighting parameters
+doWeighting = [false false false];
+% control weight decay after eq.
+wFactor = 0.0;  % [-1;1], -1 := strong decay ; 0 := linear decay ; 1 := no decay
+twEq  = 0;      % time at which weighting takes eq weight "wEq" in [years], rel. time to ts
+twNo = 2;       % time at which weighting takes default weight "wNo" in [years], rel. time to ts
+wEq = 3;        % weight at time t_ts (=eq)
+wNo = 1;        % default weight
 
 % Additional Parameters for LSE/IRLSE
 KK = 0;             % n of iterations for IRLS
@@ -208,7 +216,69 @@ for i = 1:3 % E-N-U
         );
 end
 
-% generate tau vector for transients containing all combinations of values
+%% Compute LS Weights
+
+w = zeros(length(t), 3);
+% figure % debug
+for i = 1:3 % E,N,U
+    if doWeighting(i)
+        w(:,i) = wNo;
+        tTs = unique( tsLUT{i}.time );
+        
+        figure % debug
+        %         subplot(3,1,i) % debug
+        for j = 1:length( tTs ) % Loop Transients
+            twSta = [twEq; wEq];
+            twMid = [twEq + (twNo-twEq)*0.5 ; wNo + (wEq-wNo)*0.5];
+            
+            if ( wEq-wNo ) < ( twNo-twEq )
+                scale =  norm( twSta-twMid ) * ( wEq-wNo )/( twNo-twEq );
+            else
+                scale =  norm( twSta-twMid ) * ( twNo-twEq )/( wEq-wNo );
+            end
+            
+            V = twSta - twMid;
+            if wFactor >= 1
+                warning('weighting: wFactor adjusted to be < 1')
+                wFactor = 1-1e-5;
+            elseif wFactor <= -1
+                warning('weighting: wFactor adjusted to be > -1')
+                wFactor = -1+1e-5;
+            end
+            nuV = [ V(2); -V(1) ] ./ norm( V ) * scale * wFactor;
+            twPivot = twMid + nuV;
+            
+            
+            dt = t - tTs(j);
+            wLine = [...
+                twEq, twPivot(1), twNo; ...
+                wEq, twPivot(2), wNo];
+            wx = interp1(wLine(1,:), wLine(2,:), dt, 'pchip', NaN);
+            wxIdx = ~isnan(wx);
+            w( wxIdx,i ) = wx( wxIdx );
+            
+            
+            hold on % debug
+            plot([twMid(1)+tTs(j) twPivot(1)+tTs(j)],[twMid(2) twPivot(2)], 'r'); % debug
+            plot(twSta(1)+tTs(j), twSta(2), 'gx') % debug
+            plot(twMid(1)+tTs(j), twMid(2), 'gx') % debug
+            plot(twMid(1)+tTs(j), twMid(2), 'gx') % debug
+        end
+        plot(t,w(:,i),'b.') % debug
+        
+        grid on % debug
+        ylabel('weight') % debug
+        xlabel('t') % debug
+        title(sprintf('weighting %s', coordinateName{i})) % debug
+        legend({'pivot line', 'weight controls'})
+    else
+        w(:,i) = deal(1);
+    end
+end
+
+%% Grid Search: generate tau vector 
+% for transients containing all combinations of values
+
 tsFctStr = {'log','exp'}; % used to verify user input string
 tauCell = cell(3,1);
 tauTypes = cell(3,1);
@@ -247,7 +317,16 @@ for i = 1:3 % E-N-U
         min(tauVec), max(tauVec), false);
 end
 
+% prepare array to store results rms,wrms,est.params FOR EVERY COMBINATION
+% OF TAU (rows) and E,N,U (cols)
+fxResAll = cell(3,1);
+for i = 1:3 % E-N-U
+    fxResAll{i} = zeros( size(tauCell{i},1) , 1 );
+end
+
+%% Grid Search: Set up Parameter Estimation Model
 % other variables - get count of params (poly,osc, jumps, transients) per coordinate
+
 for i = 1:3 % E-N-U
     nPolynTerms(i) = polynDeg(i) + 1; % 0, 1, 2, ...
     nOscParam(i)   = length(oscW{i}) * 2; % cos & sin components (C, S) for every oscillation
@@ -256,71 +335,6 @@ for i = 1:3 % E-N-U
     nTransients(i) = nEq(i) * nTau(i); % Only EQ Jumps -> n of transients
 end
 
-%% Compute Weights
-w = zeros(length(t), 3);
-% figure % debug
-for i = 1:3 % E,N,U
-    if doWeighting(i)
-        wFactor = -0.5;
-        twS  = 0; % rel. time to ts 
-        twN = 2; % [years]
-        wNo = 1;    % default weight
-        wEq = 3;       % weight at t=t_ts
-        w(:,i) = wNo;
-        tTs = unique( tsLUT{i}.time );
-        
-        figure % debug
-        %         subplot(3,1,i) % debug
-        for j = 1:length( tTs ) % Loop Transients
-            twSta = [twS; wEq];
-            twMid = [twS + (twN-twS)*0.5 ; wNo + (wEq-wNo)*0.5];
-            
-            if ( wEq-wNo ) < ( twN-twS )
-                scale =  norm( twSta-twMid ) * ( wEq-wNo )/( twN-twS );
-            else
-                scale =  norm( twSta-twMid ) * ( twN-twS )/( wEq-wNo );
-            end
-            
-            V = twSta - twMid;
-            nuV = [ V(2); -V(1) ] ./ norm( V ) * scale * wFactor;
-            twPivot = twMid + nuV;
-            
-            
-            dt = t - tTs(j);
-            wLine = [...
-                twS, twPivot(1), twN; ...
-                wEq, twPivot(2), wNo];
-            wx = interp1(wLine(1,:), wLine(2,:), dt, 'pchip', NaN);
-            wxIdx = ~isnan(wx);
-            w( wxIdx,i ) = wx( wxIdx );
-            
-            plot(t,w(:,i)) % debug
-            hold on % debug
-            plot([twMid(1)+tTs(j) twPivot(1)+tTs(j)],[twMid(2) twPivot(2)], 'r'); % debug
-            plot(twSta(1)+tTs(j), twSta(2), 'gx') % debug
-            plot(twMid(1)+tTs(j), twMid(2), 'gx') % debug
-            plot(twMid(1)+tTs(j), twMid(2), 'gx') % debug
-        end
-
-        
-        grid on % debug
-        ylabel('weight') % debug
-        xlabel('t') % debug
-        title(sprintf('weighting %s', coordinateName{i})) % debug
-        legend({'weights', 'pivot line', 'weight controls'})
-    else
-        w(:,i) = deal(1);
-    end
-end
-
-% prepare array to store results rms,wrms,est.params FOR EVERY COMBINATION
-% OF TAU (rows) and E,N,U (cols)
-fxResAll = cell(3,1);
-for i = 1:3 % E-N-U
-    fxResAll{i} = zeros( size(tauCell{i},1) , 1 );
-end
-
-%% Set up Parameter Estimation Model for Grid Search
 switch estimationOpt
     % outlier factor is first set to inf
     case 1 % E-N-U
@@ -373,7 +387,8 @@ switch estimationOpt
         
 end
 
-%% Parameter Estimation (Grid Search)
+%% Grid Search: Parameter Estimation
+
 nComp = length(params); % n of computations
 iRes = 1;               % count for processed coordinate components
 for i = 1:nComp % E-N-U, E&N-U, E&N&U
@@ -438,7 +453,8 @@ for i = 1:nComp % E-N-U, E&N-U, E&N&U
     end
 end
 
-%% Parameter Optimization Model (DHS/IP)
+%% DHS,IP :Parameter Optimization Model
+
 switch estimationOpt
     case 1 % E-N-U
         [lLim, uLim, x0, steps] = deal( cell(3,1) );
@@ -493,14 +509,12 @@ switch estimationOpt
         error('main: set up input parameter error: invalid value for estimationOpt (dhs,ip)')
 end
 
-restartScale = 0.1; %
-tol = 0.001;
-
-%% create map plot for tau & optimization
+%% DHS, IP: Optimization - Parameter Estimation
+% & map plots from grid search results
 for j = 2:3 % dhs-ip
     iRes = 1;
     for i = 1:nComp % E-N-U, E&N-U, E&N&U
-        
+        % GS Map Plots
         if  j == 2 && size(tauCell{i}{1},2) == 1% 1 tau
             figure
             plot(days(years( cell2mat(tauCell{i}) )) , fxResAll{i}(:) )
@@ -523,7 +537,7 @@ for j = 2:3 % dhs-ip
             hold on
         end
                 
-        % function for optimization
+        % Function for optimization
         optFun = @(x) getTrendError(...
             params{i}.t, ...     % t in years where t0=beginning of TS
             params{i}.b, ...     % vector with metric (coordinate)
@@ -543,10 +557,19 @@ for j = 2:3 % dhs-ip
         
         switch j
             case 2
-                % DHS (custom method)
-                [xMin, fxMin(i),nFnCalls(i),nRestarts(i),~] = ...
-                    dhscopt(optFun, x0{i}', steps{i}', lLim{i}', uLim{i}', tol, restartScale, false);
+%                 % DHS (custom method)
+%                 restartScale = 0.001; %
+%                 tol = 0.0001;
+%                 doPrintDebug = false;
+%                 [xMin, fxMin(i),nFnCalls(i),nRestarts(i),~] = ...
+%                     dhscopt(optFun, x0{i}', steps{i}', lLim{i}', uLim{i}', tol, restartScale, doPrintDebug);
+                % DHS (Bounded fminsearch)
+                options = optimset('Display', 'final', 'TolX', 1e-6);
+                xMin = fminsearchbnd(...
+                    optFun, x0{i}, lLim{i}, uLim{i}, options...
+                    );
                 hold off
+                
             case 3
                 % MATLAB method
                 if ~isempty(x0{i})
@@ -618,7 +641,12 @@ for j = 1:3 % grid search-dhs-ip
     % Write to File
     % Open Log File and get identifier
     logFile = [stationName,'.', currTime, method,'.log']; % output: log file name
-    fID = fopen(fullfile(logFileFolder, logFile), 'wt');
+    
+    fID = fopen(fullfile(logFileFolder, logFile), 'wt'); % log file ID
+    writeHeaderLog(fID, stationName, data{1, 'date'}, data{end, 'date'}, length(data{:, 'date'}), ...
+        estimationOpt, tarFct, doITRFjump, doTsOverlay, doRemoveTs, doWeighting, ...
+        [wFactor, wEq, wNo, twEq, twNo])
+    
     for i = 1:3 % E-N-U
         writeInputLog(fID, stationName, coordinateName{i}, data{:, 'date'}, ...
             polynDeg(i), osc{i}, heavJumps{i}, ...
@@ -636,6 +664,7 @@ for j = 1:3 % grid search-dhs-ip
             resStor{i}(j).error ...
             )
     end
+    
     fclose(fID); % close log file
     fprintf('Calculation finished.\nPlotting and writing results (%s)...\n', method)
     

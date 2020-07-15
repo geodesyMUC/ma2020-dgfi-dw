@@ -18,7 +18,7 @@ q = 1/( n*sqrt(2) )*( sqrt( n+1 )-1 );      % initial simplex parameter 2
 
 if doPlot; plot(xInit(1),xInit(2),'kx'); end
 
-maxRestarts = 5;
+maxRestarts = 10;
 restarts = 0;
 % Catch case where no parameters are to be optimized
 if n == 0
@@ -161,7 +161,14 @@ while restarts <= maxRestarts
     
     % RESTART if local minimum
     doRestart = false;
-    
+    % factorial test over all dimensions
+    if doPlot
+        pS = plotSimplex(X);
+        pOpt = plot(xOpt(1), xOpt(2), 'g*');
+        pause(1)
+        delete(pS)
+        delete(pOpt)
+    end
     for i = 1:n
         xTest = xOpt;
         delta = epsi * L(i); % step
@@ -211,6 +218,7 @@ while restarts <= maxRestarts
 end
 
 if restarts > maxRestarts
+    fprintf('dhs: maximum number of restarts exceeded. last best values returned\n')
     err = sprintf('maximum number of restarts exceeded (%d). last best values returned', maxRestarts);
 end
 end

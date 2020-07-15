@@ -68,7 +68,7 @@ for i = 1:n_components
     %% Set up plot legend
     my_legend_elements = [pRes, pITRF];    
     % Update legend Items Outliers
-    plotLogical = false(3 + length(jump_categories_names), 1);
+    plotLogical = false(2 + length(jump_categories_names), 1);
     plotLogical(1:2) = true; % observations, trend, itrf always in plot
     
     plotElement = cell(length(jump_categories_names), 1); % plot elements storage
@@ -81,12 +81,12 @@ for i = 1:n_components
                 plotElement{c} = plot([t_jump(n); t_jump(n)], [y1; y2], ... % plot jump
                     'color', jump_color_map(c, :)./255); % use color from map
                 
-                if ~plotLogical(3 + c) % if category of this jump is still FALSE ...
+                if ~plotLogical(2 + c) % if category of this jump is still FALSE ...
                     % this has do be done only ONCE per category, else
                     % there will be duplicate legend entries
                     my_legend_elements = [my_legend_elements, plotElement{c}]; % add jump category to legend
                 end
-                plotLogical(3 + c) = true; % set category of this jump to TRUE
+                plotLogical(2 + c) = true; % set category of this jump to TRUE
             end
         end
     end
