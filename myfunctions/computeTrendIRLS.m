@@ -82,8 +82,17 @@ else
 end
 %% (2) Detect & Remove outliers
 % check if outliers are present
-outlierLogical = abs(e) > ( mean(e) + std(e)*outl_factor ); % Logical with outliers
 
+% v1
+% outlierLogical = abs(e) > ( mean(e) + std(e)*outl_factor ); % Logical with outliers
+
+% v2
+% Logical with outliers based Median Absolute Deviation MAD
+outlierLogical = abs(e) > ( abs( median(e) ) + median( abs(e - median(e)) ) * 1.4826 * outl_factor); 
+
+if nnz(outlierLogical) > 0
+    disp(num2str(nnz(outlierLogical)));
+end
 % if so, then remove outliers and compute LSE one more time
 if outl_factor < 100 && nnz(outlierLogical) > 0
     b(outlierLogical)    = []; % remove them from observation vector b

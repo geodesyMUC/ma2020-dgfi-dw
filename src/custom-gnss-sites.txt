@@ -1,0 +1,15 @@
+ +SITE/ID
+*CODE PT __DOMES__ T _STATION DESCRIPTION__ _LONGITUDE_ _LATITUDE__ HEIGHT_
+
+USUD  A 21729S007 P USUDA, JAPAN           138 21 43.3  36 07 59.1  1508.6 check: http://www.igs.org/igsnetwork/network_by_site.php?site=usud00jpn
+P203  A 21778S001 P P-Kushiro - Hokkaido,  144 22 17.0  42 58 32.0    35.9 ??? check: https://webigs.ign.fr/tfcc/en/station/P203/coordinates
+SANT  A 41705M003 P Santiago, CHILE        289 19 53.2 -33 09 01.0   723.0 check: http://www.igs.org/igsnetwork/network_by_site.php?site=sant00chl
+SAMP  A 23104M001 P Medan, INDONESIA        98 42 52.9   3 37 17.8     2.0 ??? check: https://webigs.ign.fr/tfcc/en/station/SAMP/residuals
+P102  A 21754S001 P P-Okushiri - Hokkaido, 139 29 21.0  42 04 43.6    42.3 ??? check: https://webigs.ign.fr/tfcc/en/station/P102/coordinates
+MIZU  A 21702M002 P MIZUSAWA, JAPAN        141 07 58.1  39 08 06.6   117.0 check: http://www.igs.org/igsnetwork/network_by_site.php?site=mizu00jpn
+CONT  A 41719M004 P Concepcion, CHILE      286 58 28.6 -36 50 34.2   173.4 check: http://www.igs.org/igsnetwork/network_by_site.php?site=cont00chl
+
+
+
+
+

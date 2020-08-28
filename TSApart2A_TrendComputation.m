@@ -51,10 +51,10 @@ doStaticFile = true;
 
 % stationName = '21701S007A03'; % KSMV %[ok]
 % stationName = '21702M002A07'; % MIZU %[ok]
-% stationName = '21729S007A04'; % USUDA %[ok]
+stationName = '21729S007A04'; % USUDA %[ok]
 % stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
-stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
+% stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
 % stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
 % stationName = '41719M004A02'; % Concepcion %[ok]
 
@@ -80,7 +80,7 @@ transientType = {...
 % earthquake events (jumps):
 % vector mapping different T (tau) relaxation coefficients [years]
 tauVec1 = years(days(1:5:50));
-tauVec2 = years(days(200:20:1000));
+tauVec2 = years(days(100:25:1000));
 % tauVec1 = years(days(1:5:365)); % full range tau
 
 % optimization constraints for transient 1 and transient 2 [years]
@@ -90,16 +90,16 @@ uppLimit = [200/365.25, 8];
 % weighting parameters
 doWeighting = [false false false];
 % control weight decay after eq.
-wFactor = 0.0;  % [-1;1], -1 := strong decay ; 0 := linear decay ; 1 := no decay
+wFactor = 0;  % [-1;1], -1 := strong decay ; 0 := linear decay ; 1 := no decay
 twEq  = 0;      % time at which weighting takes eq weight "wEq" in [years], rel. time to ts
 twNo = 2;       % time at which weighting takes default weight "wNo" in [years], rel. time to ts
-wEq = 3;        % weight at time t_ts (=eq)
-wNo = 1;        % default weight
+wEq = 1;        % weight at time t_ts (=eq)
+wNo = 0;        % default weight
 
 % Additional Parameters for LSE/IRLSE
 KK = 0;             % n of iterations for IRLS
 p = 1.0;            % L_p Norm for IRLS
-outlFactor = 4;   % median(error) + standard deviation * factor -> outlier
+outlFactor = 3;     % median(error) + standard deviation * factor -> outlier
 
 % other variables
 coordinateName    = {'E [mm]', 'N [mm]', 'U [mm]'}; % used to label plots
@@ -237,7 +237,7 @@ for i = 1:3 % E,N,U
                 scale =  norm( twSta-twMid ) * ( twNo-twEq )/( wEq-wNo );
             end
             
-            V = twSta - twMid;
+            
             if wFactor >= 1
                 warning('weighting: wFactor adjusted to be < 1')
                 wFactor = 1-1e-5;
@@ -245,10 +245,15 @@ for i = 1:3 % E,N,U
                 warning('weighting: wFactor adjusted to be > -1')
                 wFactor = -1+1e-5;
             end
-            nuV = [ V(2); -V(1) ] ./ norm( V ) * scale * wFactor;
-            twPivot = twMid + nuV;
-            
-            
+            % v1:
+%             V = twSta - twMid;
+%             nuV = [ V(2); -V(1) ] ./ norm( V ) * scale * wFactor;
+%             twPivot = twMid + nuV;
+            % v2:
+            V = [twNo; wEq] - twMid;
+            newV = V * wFactor;
+            twPivot = twMid + newV;
+            % ---
             dt = t - tTs(j);
             wLine = [...
                 twEq, twPivot(1), twNo; ...
@@ -268,9 +273,9 @@ for i = 1:3 % E,N,U
         
         grid on % debug
         ylabel('weight') % debug
-        xlabel('t') % debug
-        title(sprintf('weighting %s', coordinateName{i})) % debug
-        legend({'pivot line', 'weight controls'})
+        xlabel('t rel. to t_{0} [y]') % debug
+        title(sprintf('Weighting for "%s" (%s)', coordinateName{i}(1), stationName)) % debug
+        legend({'pivot line', 'weight controls'}, 'location', 'southoutside')
     else
         w(:,i) = deal(1);
     end
@@ -518,21 +523,35 @@ for j = 2:3 % dhs-ip
         if  j == 2 && size(tauCell{i}{1},2) == 1% 1 tau
             figure
             plot(days(years( cell2mat(tauCell{i}) )) , fxResAll{i}(:) )
-            xlabel('\tau_{log} [days]')
+            xlabel('\tau [days]')
             ylabel('rms [mm]')
             title(["\tau parameter space for ", computationName{i}])
         elseif  j == 2 && size(tauCell{i}{1},2) == 2 && length(tauVec1)>1 && length(tauVec2)>1  % 2 tau
-            resultGrid = reshape(fxResAll{i}(:,1), length(tauVec2), length(tauVec1) );
-            figure
+            resultGrid = reshape(fxResAll{i}(:,1), length( tauVec2 ) , length( tauVec1 ));
+            
+            % figure
+            
+            hold off
+            subplot(1,3, i)
+            % v1 smooth gradient plot
             colormap(flipud(parula)) % low error = good
+            pcolor(days(years( tauVec1 )), tauVec2, resultGrid);
+            hold on
+            shading interp;
+            contour(days(years( tauVec1 )), tauVec2, resultGrid,'LineColor',[97, 97, 92]./255);
+            
+            % v2 distinct gradient plot
+            % colormap(flipud(parula)) % low error = good
             % contourf(days(years(tauVec1)),days(years(tauVec2)),resultGrid);
-            contourf(tauVec1,tauVec2,resultGrid);
-            xlabel('\tau_{log1}SHORT [y]')
-            ylabel('\tau_{log2}LONG [y]')
-            title(["\tau parameter space for ", computationName{i}])
+            % contourf( days(years( tauVec1 )), tauVec2, resultGrid);
+            
+            % plot options
+            xlabel('\tau_{1}short [days]')
+            ylabel('\tau_{2}long [years]')
+            title(['\tau parameter space for ', computationName{i}])
             c = colorbar;
             c.Label.String = 'RMS[mm]';
-            xlim([min(tauVec1) , max(tauVec1)])
+            xlim([min( days(years( tauVec1 ))) , max(days(years( tauVec1 )))])
             ylim([min(tauVec2) , max(tauVec2)])
             hold on
         end
