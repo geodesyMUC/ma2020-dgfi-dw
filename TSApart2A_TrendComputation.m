@@ -51,8 +51,8 @@ doStaticFile = true;
 
 % stationName = '21701S007A03'; % KSMV %[ok]
 % stationName = '21702M002A07'; % MIZU %[ok]
-stationName = '21729S007A04'; % USUDA %[ok]
-% stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
+% stationName = '21729S007A04'; % USUDA %[ok]
+stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
 % stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
@@ -155,7 +155,8 @@ VisualizeTS_ENU2(data, dataStation, currStationJumps{:, 2}, ...
 oscW = cellfun(@(x) 2*pi./x, osc, 'UniformOutput', false);
 
 % Time Series Timestamps
-t  = data{:, 't'};       % timestamps [seconds];
+% t  = data{:, 't'};       % timestamps [seconds];
+t  = t ./  (86400 * 365.25) ; % convert timestamps to [JULIAN years]
 t  = years( seconds(t) ); % convert timestamps to [years]
 t  = t-t(1);             % adjust for negative t values
 t0 = data{1, 'date'};    % timestamp [datetime] of first measurement
@@ -187,9 +188,14 @@ for i = 1:3 % E-N-U
         jumps = [jumps; jumps0itrf];
     end
     
-    % Convert to [years] & assign to cell array 
-    transients{i} = years( ts_t );
-    heavJumps{i}  = years( jumps );
+%     % Convert to [years] & assign to cell array 
+%     transients{i} = years( ts_t );
+%     heavJumps{i}  = years( jumps );
+    
+    % Convert to [JULIAN years] & assign to cell array 
+    transients{i} = seconds( ts_t  ) ./  (86400 * 365.25) ;
+    heavJumps{i}  = seconds( jumps ) ./  (86400 * 365.25);
+    
     % Lookup Table for relative transient timestamps, types and limits (->dhs,ip)
     tsLUT{i} = getTransientReferences(transients{i}, transientType(i,:), ...
         lowLimit, uppLimit, doRemoveTs);
@@ -281,7 +287,7 @@ for i = 1:3 % E,N,U
     end
 end
 
-%% Grid Search: generate tau vector 
+%% Grid Search: generate tau vector
 % for transients containing all combinations of values
 
 tsFctStr = {'log','exp'}; % used to verify user input string
