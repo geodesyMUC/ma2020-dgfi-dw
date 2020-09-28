@@ -30,8 +30,10 @@ addpath('myfunctions')
 % jumpCSVLocation = 'src/jumps_version3.csv'; % Location of Jump Table/Jump Database
 % itrf_changes_textfile = 'src/itrf_changes.txt';
 
+% inputFolder = 'station_data_dailyXYZfiles_xyz'; % XYZ files
 inputFolder = 'station_data_dailyXYZfiles'; % Where Station Data (TSA_ReadAndTransform) is stored as ".mat"
-jumpCSVLocation = 'src/jumps_dailyXYZfiles.csv'; % Location of Jump Table/Jump Database
+
+jumpCSVLocation = 'src/jumps-ma.csv'; % Location of Jump Table/Jump Database
 itrfChangesTextfile = 'src/itrf_changes.txt';
 doSaveResults = false; % save pngs and result files
 doStaticFile = true;
@@ -49,43 +51,50 @@ doStaticFile = true;
 % stationName = 'RWSN'; % Rawson, Argentina
 % stationName = 'PBJP';
 
-% stationName = '21701S007A03'; % KSMV %[ok]
+stationName = '21701S007A03'; % KSMV %[ok]
 % stationName = '21702M002A07'; % MIZU %[ok]
 % stationName = '21729S007A04'; % USUDA %[ok]
-stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
+% stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
 % stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
 % stationName = '41719M004A02'; % Concepcion %[ok]
 
+% stationName = '41713S001A02'; % Los Angeles, Chile
+% stationName = '21762S001A01'; % Kashiwazaki [3eq ok]
+% stationName = '23114M001A01';  % Pulau Simuk, Ind
+
 %%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-polynDeg = [1, -1, -1];% Polynomial Trend,Integer Degree, Range [-1..3]
+polynDeg = [1, 1, 1];% Polynomial Trend,Integer Degree, Range [-1..3]
 % periods / oscillations in YEARS (=365.25 days) in vector form
 osc = {[0.5 1], [0.5 1], [0.5 1]};     % common values: 0.5y, 1y
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
 doITRFjump  = [false false false]; % E-N-U
 doEQjump    = [true true true]; % E-N-U
-doRemoveTs = true; % global
+doRemoveTs = false; % global
 doTsOverlay = false; % global
 estimationOpt = 1; % 1: E-N-U , 2: E&N-U , 3: E&N&U
 tarFct = 'rms';
 
 % specify type of transient: "log","exp","nil"
 transientType = {...
-    'log','log'; ...    % coordinate1:E|X
-    'log','log'; ...    % coordinate2:N|Y
-    'log','log'};       % coordinate3:U|Z
+    'exp','exp'; ...    % coordinate1:E|X
+    'exp','exp'; ...    % coordinate2:N|Y
+    'exp','exp'};       % coordinate3:U|Z
 
 % Parameter tau in [years] for computation of logarithmic transient for
 % earthquake events (jumps):
 % vector mapping different T (tau) relaxation coefficients [years]
-tauVec1 = years(days(1:5:50));
-tauVec2 = years(days(100:25:1000));
+tauVec1 = years(days(1:5:95));
+tauVec2 = years(days(100:25:365*3));
 % tauVec1 = years(days(1:5:365)); % full range tau
 
 % optimization constraints for transient 1 and transient 2 [years]
-lowLimit = [ 0.01/365.25, 250/365.25];
-uppLimit = [200/365.25, 8];
+lowLimit = [ 1/365.25, 100/365.25]; % simplex plot
+uppLimit = [95/365.25, 5000/365.25]; % simplex plot
+
+% lowLimit = [ 0.01/365.25, 250/365.25];
+% uppLimit = [200/365.25, 8];
 
 % weighting parameters
 doWeighting = [false false false];
@@ -99,11 +108,11 @@ wNo = 0;        % default weight
 % Additional Parameters for LSE/IRLSE
 KK = 0;             % n of iterations for IRLS
 p = 1.0;            % L_p Norm for IRLS
-outlFactor = 3;     % median(error) + standard deviation * factor -> outlier
+outlFactor = 5;     % median(error) + standard deviation * factor -> outlier
 
 % other variables
 coordinateName    = {'E [mm]', 'N [mm]', 'U [mm]'}; % used to label plots
-% coordinateName    = {'X [mm] rel. to x_1', 'Y [mm] rel. to y_1', 'Z [mm] rel. to z_1'}; % used to label plots
+% coordinateName    = {'X_{red} [mm]', 'Y_{red} [mm]', 'Z_{red} [mm]'}; % used to label plots
 jumpCategoryNames = {'Earthquake', 'SW/HW-Change', 'Unknown'}; % corresponds to jump table columns
 
 %%% Output %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -147,17 +156,19 @@ currStationJumps = currStationJumps(currStationJumps.Use == 1, :);
 % Plot TS and Jumps
 figVis = figure;
 % VisualizeTS_ENU(data, dataSTATION_NAME, currStationJumps{:, 2})
-VisualizeTS_ENU2(data, dataStation, currStationJumps{:, 2}, ...
-    'jumpTypes', currStationJumps{:, 4:5});
+VisualizeTS_ENU2(data, dataStation, NaT(1,1) ...
+    );
+% VisualizeTS_ENU2(data, dataStation, currStationJumps{:, 2}, ...
+%     'jumpTypes', currStationJumps{:, 4:5});
 
 %% Prepare Data for LS Estimation
 % Convert Oscillation Periods to Angular Velocity
 oscW = cellfun(@(x) 2*pi./x, osc, 'UniformOutput', false);
 
 % Time Series Timestamps
-% t  = data{:, 't'};       % timestamps [seconds];
+t  = data{:, 't'};       % timestamps [seconds];
 t  = t ./  (86400 * 365.25) ; % convert timestamps to [JULIAN years]
-t  = years( seconds(t) ); % convert timestamps to [years]
+% t  = years( seconds(t) ); % convert timestamps to [years]
 t  = t-t(1);             % adjust for negative t values
 t0 = data{1, 'date'};    % timestamp [datetime] of first measurement
 
@@ -522,6 +533,7 @@ end
 
 %% DHS, IP: Optimization - Parameter Estimation
 % & map plots from grid search results
+
 for j = 2:3 % dhs-ip
     iRes = 1;
     for i = 1:nComp % E-N-U, E&N-U, E&N&U
@@ -535,16 +547,22 @@ for j = 2:3 % dhs-ip
         elseif  j == 2 && size(tauCell{i}{1},2) == 2 && length(tauVec1)>1 && length(tauVec2)>1  % 2 tau
             resultGrid = reshape(fxResAll{i}(:,1), length( tauVec2 ) , length( tauVec1 ));
             
-            % figure
+            if i == 1 % subplot. if not, just set up figure
+                figure; %
+                hold off % subplot
+                subplot(1,3, i) % for subplots
+            end % open only 1 figure at start
+
+            figure
             
-            hold off
-            subplot(1,3, i)
+            xAxisPlot = days(years( tauVec1 )); % scale xaxis to days
+            
             % v1 smooth gradient plot
             colormap(flipud(parula)) % low error = good
-            pcolor(days(years( tauVec1 )), tauVec2, resultGrid);
+            pcolor( xAxisPlot , tauVec2, resultGrid);
             hold on
             shading interp;
-            contour(days(years( tauVec1 )), tauVec2, resultGrid,'LineColor',[97, 97, 92]./255);
+            contour( xAxisPlot , tauVec2, resultGrid,'LineColor',[97, 97, 92]./255);
             
             % v2 distinct gradient plot
             % colormap(flipud(parula)) % low error = good
@@ -557,7 +575,7 @@ for j = 2:3 % dhs-ip
             title(['\tau parameter space for ', computationName{i}])
             c = colorbar;
             c.Label.String = 'RMS[mm]';
-            xlim([min( days(years( tauVec1 ))) , max(days(years( tauVec1 )))])
+            xlim([min( xAxisPlot ) , max( xAxisPlot )])
             ylim([min(tauVec2) , max(tauVec2)])
             hold on
         end
@@ -582,12 +600,14 @@ for j = 2:3 % dhs-ip
         
         switch j
             case 2
+                
 %                 % DHS (custom method)
 %                 restartScale = 0.001; %
 %                 tol = 0.0001;
-%                 doPrintDebug = false;
+%                 doPrintDebug = true;
 %                 [xMin, fxMin(i),nFnCalls(i),nRestarts(i),~] = ...
 %                     dhscopt(optFun, x0{i}', steps{i}', lLim{i}', uLim{i}', tol, restartScale, doPrintDebug);
+
                 % DHS (Bounded fminsearch)
                 options = optimset('Display', 'final', 'TolX', 1e-6);
                 xMin = fminsearchbnd(...
@@ -599,7 +619,7 @@ for j = 2:3 % dhs-ip
                 % MATLAB method
                 if ~isempty(x0{i})
                     options = optimoptions(@fmincon,...
-                        'Display','iter','Algorithm','interior-point');
+                        'Display','final','Algorithm','interior-point');
                     [xMin,fxMin_{i}] = fmincon(optFun,x0{i},...
                         [],[],[],[],lLim{i},uLim{i},[],options);
                 else
@@ -713,13 +733,23 @@ for j = 1:3 % grid search-dhs-ip
     titleString = cell(3, 1); % preallocate
     for i = 1:3 % E-N-U
         % set up plot title
-        if isempty(tauTypes{i});tsStr='none'; else; tsStr=sprintf('%s %s', transientType{i,1},transientType{i,2}); end
-        titleString{i} = sprintf('Station:"%s" Transient:%s jump(itrf):%s  jump(eq):%s  RMS=%.2fmm WRMS=%.2fmm (%s)', ...
-            stationName, tsStr,...
-            mat2str(doITRFjump(i)), ...
-            mat2str(doEQjump(i)), ...
+        if isempty(tauTypes{i});tsStr='-'; else; tsStr=sprintf('%s-%s', transientType{i,1},transientType{i,2}); end
+        
+        % classic
+%         titleString{i} = sprintf('Station:"%s" Transient:%s jump(itrf):%s  jump(eq):%s  RMS=%.2fmm WRMS=%.2fmm (%s)', ...
+%             stationName, tsStr,...
+%             mat2str(doITRFjump(i)), ...
+%             mat2str(doEQjump(i)), ...
+%             resStor{i}(j).error{1,2}, resStor{i}(j).error{2,2}, ... % rms,wrms
+%             method);
+        
+        % thesis print
+        titleString{i} =  sprintf('"%s" nP:%d nJ:%d nF:%d nEq:%d ts:%s RMS=%.2f WRMS=%.2f (%s)', ...
+            stationName, ...
+            polynDeg(i), length( jumps), length( osc{i} ), nEq(i), tsStr, ...   
             resStor{i}(j).error{1,2}, resStor{i}(j).error{2,2}, ... % rms,wrms
-            method); 
+            method);
+        
     end
     
     % visualize time series and results
@@ -733,7 +763,7 @@ for j = 1:3 % grid search-dhs-ip
         currStationJumps{:, 'Date'}, ...
         [currStationJumps{:, 'Earthquake'}, currStationJumps{:, 'HWSW_Change'}, currStationJumps{:, 'Unknown'}], ...
         jumpCategoryNames, ...
-        readITRFChanges(itrfChangesTextfile)...
+        []...%readITRFChanges(itrfChangesTextfile)...
         )
     % set(gcf, 'InnerPosition', [0 0 604 513]); % small figure
     set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure

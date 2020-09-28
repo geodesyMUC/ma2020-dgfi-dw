@@ -88,16 +88,17 @@ end
 
 % v2
 % Logical with outliers based Median Absolute Deviation MAD
-outlierLogical = abs(e) > ( abs( median(e) ) + median( abs(e - median(e)) ) * 1.4826 * outl_factor); 
+outlierLogical = abs(e) > ( abs( median(e) ) + median( abs(e - median(e)) ) * outl_factor); 
 
 if nnz(outlierLogical) > 0
-    disp(num2str(nnz(outlierLogical)));
+    fprintf('removed %s obs (MAD)\n', num2str(nnz(outlierLogical)));
 end
 % if so, then remove outliers and compute LSE one more time
 if outl_factor < 100 && nnz(outlierLogical) > 0
     b(outlierLogical)    = []; % remove them from observation vector b
     A(outlierLogical, :) = []; % remove them from design matrix A
     w(outlierLogical)    = []; % remove them from weight vector w
+    x(outlierLogical)    = []; % remove them from time vector t (x)
     % LS one more time
     [xEst, e] = computeLeastSquares(A, b);
 end
@@ -218,7 +219,7 @@ function [xEst, e] = computeLeastSquares(A, b)
 Nmat = A' * A; % normal equations
 n = A' * b;
 xEst = pinv(Nmat, 1e-8) * n;
-xEstx = Nmat\A'*b;
+% xEstx = Nmat\A'*b;
 
 % % Option 3 --- Use Function
 % xEst = lsqInvMMult(A' * A, A' * b);

@@ -1,6 +1,19 @@
-function [xOpt, fxOpt, nF, restarts, err] = dhscopt(fn, xInit, L, low, upp, tol, restartScale, doPlot)
-err = '';
+function [xOpt, fxOpt, nF, restarts, err] = dhscopt(fn, xInit, params)
+% dhscopt(fn, xInit, L, tol, restartScale, doPlot) % old
+L = params.UB - params.LB;
+restartScale = 0.40;
+doPlot = false;
+tol = 1e-9;
 
+% if used w fminsearchbnd:
+fn = @(x) fn(x, params); 
+xInit = xInit';
+low = ones(size(params.LB)) * -inf;
+upp = ones(size(params.UB)) * inf;
+
+err = '';
+% low = inf;
+% upp = inf;
 n = length(xInit);  % dimension of problem
 
 chi = 2;            % expansion
@@ -12,13 +25,13 @@ epsi = 0.001;       % default value for factorial test
 % restartScale = 0.1; % default value for scale of restart simplex
 nF = 0;             % number of fct calls
 
-stepScale = 1;
+stepScale = 0.15; % alternative: 1
 p = 1/( n*sqrt(2) )*( n-1+sqrt( n+1 ) );    % initial simplex parameter 1
 q = 1/( n*sqrt(2) )*( sqrt( n+1 )-1 );      % initial simplex parameter 2
 
 if doPlot; plot(xInit(1),xInit(2),'kx'); end
 
-maxRestarts = 10;
+maxRestarts = 5;
 restarts = 0;
 % Catch case where no parameters are to be optimized
 if n == 0
@@ -33,18 +46,27 @@ end
 while restarts <= maxRestarts
     % Set up initial Simplex (axis by axis approach)
     x_ = [xInit; zeros(n+1-1, n)];
+    
+    % v1 shifting along axes
     for i = 2:n+1 % vertices
-        for j = 1:n % dimensions
-            if j == i-1
-                x_(i,j) = xInit(j) + stepScale*L(j)*p;
-            elseif j ~= i-1
-                x_(i,j) = xInit(j) + stepScale*L(j)*q;
-            end
-            %         % random scale factor
-            %         x_(i,j) = low(j) + rand(1,1)*(upp(j)-low(j));
-        end
-        x_(i,:) = shiftInBox(x_(i,:),low,upp);
+       for j = 1:n % dimensions
+           x_(i,j) = xInit(j) + L(j);
+       end
     end
+    
+%     % v2
+%     for i = 2:n+1 % vertices
+%         for j = 1:n % dimensions
+%             if j == i-1
+%                 x_(i,j) = xInit(j) + stepScale*L(j)*p;
+%             elseif j ~= i-1
+%                 x_(i,j) = xInit(j) + stepScale*L(j)*q;
+%             end
+%             %         % random scale factor
+%             %         x_(i,j) = low(j) + rand(1,1)*(upp(j)-low(j));
+%         end
+% %         x_(i,:) = shiftInBox(x_(i,:),low,upp);
+%     end
     X = x_;
     
     if doPlot 
@@ -74,12 +96,12 @@ while restarts <= maxRestarts
         
         % compute centroid of all vertices except x(end)
         m = sum( X(1:end-1,:) ,1) .* 1/n;
-        m = shiftInBox(m,low,upp); % boundary check
+%         m = shiftInBox(m,low,upp); % boundary check
         if doPlot; pM = plot(m(1),m(2),'go'); end
         
         % reflect
         r = ( 1+rho ).*m - rho.*X(end,:);
-        r = projectOnBounds(X(end,:), r, m, rho, low, upp); % boundary check
+        %r = projectOnBounds(X(end,:), r, m, rho, low, upp); % boundary check
         fr = fn( r );
         nF = nF+1;
         if doPlot; pR = plot(r(1),r(2),'mo'); end
@@ -87,7 +109,7 @@ while restarts <= maxRestarts
         if fr < fX(1)
             % expand
             e = ( 1 + rho*chi ).*m - rho*chi.*X(end,:);
-            e = projectOnBounds(X(end,:), e, m, rho*chi, low, upp); % boundary check
+            %e = projectOnBounds(X(end,:), e, m, rho*chi, low, upp); % boundary check
             fe = fn( e );
             nF = nF+1;
             if doPlot; pE = plot(e(1),e(2),'cx'); end
@@ -110,7 +132,7 @@ while restarts <= maxRestarts
         elseif fX(end-1) <= fr && fr < fX(end)
             % outside contraction
             c = ( 1+ gamma*rho ).*m - gamma*rho*X(end-1,:);
-            c = projectOnBounds(X(end-1,:), c, m, gamma*rho, low, upp); % boundary check
+            %c = projectOnBounds(X(end-1,:), c, m, gamma*rho, low, upp); % boundary check
             fc = fn( c );
             nF = nF+1;
             if doPlot; pC = plot(c(1),c(2),'yx'); end
@@ -260,10 +282,12 @@ end
 function x = shiftInBox(x,lBound,uBound)
 % box method
 % input vectors: investigated vertex, lower bounds, upper bounds
-x(x < lBound) = lBound(x < lBound)+0.000001;
-x(x > uBound) = uBound(x > uBound)-0.000001;
+x(x < lBound) = lBound(x < lBound) + 0.000001;
+x(x > uBound) = uBound(x > uBound) - 0.000001;
 end
 
 function plotObj = plotSimplex(X)
-    plotObj = plot( [X(:,1);X(1,1)] , [X(:,2);X(1,2)] ,'r');
+%     plotObj = plot( [X(:,1);X(1,1)].*365.25 , [X(:,2);X(1,2)] ,'r'); % plot with days
+    plotObj = plot( [X(:,1);X(1,1)], [X(:,2);X(1,2)] ,'r'); % plot w
+%     years (default)
 end

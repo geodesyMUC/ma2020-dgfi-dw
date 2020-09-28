@@ -226,7 +226,9 @@ end
 
 % now we can call fminsearch, but with our own
 % intra-objective function.
-[xu,fval,exitflag,output] = fminsearch(@intrafun,x0u,options,params);
+
+[xu,fval,exitflag,output] = fminsearch(@intrafun,x0u,options,params); % MATLAB
+% [xu,fval, nF, exitflag, output] = dhscopt(@intrafun, x0u, params); % custom method
 
 % undo the variable transformations into the original space
 x = xtransform(xu,params);

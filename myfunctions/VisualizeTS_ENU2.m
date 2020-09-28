@@ -53,7 +53,7 @@ for i = 1:3
             pAnt = plot([p.Results.jumps(j); p.Results.jumps(j)], [y1; y2], ...
                 'color', [0.75, 0, 0.75]);
             pLogical(3) = true;
-        else
+        elseif ~isnat(p.Results.jumps(j))
             % Unknown cause
             pUnk = plot([p.Results.jumps(j); p.Results.jumps(j)], [y1; y2], ...
                 'color', [0.4660, 0.6740, 0.1880]);
