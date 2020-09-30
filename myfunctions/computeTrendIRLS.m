@@ -52,6 +52,7 @@ nB = size(x,2);
 A = zeros( nnz(x) , sum(polynDeg)+nCoord + length(osc)*2*nCoord + numel(j_t) + numel(ts_t) );
 nxEst = 0;
 nxEstStor = zeros( nCoord+1 , 1);
+
 for i = 1:nCoord
     j = (i-1)*nB + 1;
     k = nxEst + 1;
@@ -76,8 +77,8 @@ if w == ones(length(w),1)
     [xEst, e] = computeLeastSquares(A, b);
 else
     % WLS
-%     [xEst, e] = computeWeightedLeastSquares(A, b, w);
-    xEst = lscov(A,b,w); % MATLAB method
+    [xEst, e] = computeWeightedLeastSquares(A, b, w);
+%     xEst = lscov(A,b,w); % MATLAB method
     e = A*xEst - b;
 end
 %% (2) Detect & Remove outliers

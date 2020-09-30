@@ -41,9 +41,9 @@ for i = 1:n_components
     % Plot Measurements
     pPts = plot(t_obs(~obs_outlier_logical{i}), obs(~obs_outlier_logical{i}, i), ...
         '.', 'markersize', 4, ...
-        'Color', [0, 0.4470, 0.7410]);
+        'Color', [107, 161, 250]./255);
     hold on
-
+    % old color (darkish blue) [0, 0.4470, 0.7410]
     % Plot Trend
     pTrend = plot(t_trend, trends(:, i), 'r');
     ylabel(sprintf('%s', obs_names{i}))

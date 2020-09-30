@@ -51,10 +51,10 @@ doStaticFile = true;
 % stationName = 'RWSN'; % Rawson, Argentina
 % stationName = 'PBJP';
 
-stationName = '21701S007A03'; % KSMV %[ok]
+% stationName = '21701S007A03'; % KSMV %[ok]
 % stationName = '21702M002A07'; % MIZU %[ok]
 % stationName = '21729S007A04'; % USUDA %[ok]
-% stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
+stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
 % stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
@@ -65,9 +65,13 @@ stationName = '21701S007A03'; % KSMV %[ok]
 % stationName = '23114M001A01';  % Pulau Simuk, Ind
 
 %%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-polynDeg = [1, 1, 1];% Polynomial Trend,Integer Degree, Range [-1..3]
+polynDeg = [-1, -1, -1];% Polynomial Trend,Integer Degree, Range [-1..3]
+
 % periods / oscillations in YEARS (=365.25 days) in vector form
 osc = {[0.5 1], [0.5 1], [0.5 1]};     % common values: 0.5y, 1y
+% osc = {[1], [1], [1]};     % common values: 0.5y, 1y
+% osc = {[], [], []};
+
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
 doITRFjump  = [false false false]; % E-N-U
 doEQjump    = [true true true]; % E-N-U
@@ -78,20 +82,20 @@ tarFct = 'rms';
 
 % specify type of transient: "log","exp","nil"
 transientType = {...
-    'exp','exp'; ...    % coordinate1:E|X
-    'exp','exp'; ...    % coordinate2:N|Y
-    'exp','exp'};       % coordinate3:U|Z
+    'log','exp'; ...    % coordinate1:E|X
+    'log','exp'; ...    % coordinate2:N|Y
+    'log','exp'};       % coordinate3:U|Z
 
 % Parameter tau in [years] for computation of logarithmic transient for
 % earthquake events (jumps):
 % vector mapping different T (tau) relaxation coefficients [years]
-tauVec1 = years(days(1:5:95));
-tauVec2 = years(days(100:25:365*3));
+tauVec1 = years(days(1:10:100));
+tauVec2 = years(days(101:25:365*3));
 % tauVec1 = years(days(1:5:365)); % full range tau
 
 % optimization constraints for transient 1 and transient 2 [years]
-lowLimit = [ 1/365.25, 100/365.25]; % simplex plot
-uppLimit = [95/365.25, 5000/365.25]; % simplex plot
+lowLimit = [ 0.1/365.25, 20/365.25]; % simplex plot
+uppLimit = [19/365.25, 5000/365.25]; % simplex plot
 
 % lowLimit = [ 0.01/365.25, 250/365.25];
 % uppLimit = [200/365.25, 8];
@@ -99,11 +103,14 @@ uppLimit = [95/365.25, 5000/365.25]; % simplex plot
 % weighting parameters
 doWeighting = [false false false];
 % control weight decay after eq.
-wFactor = 0;  % [-1;1], -1 := strong decay ; 0 := linear decay ; 1 := no decay
+wFactor = 1;  % [-1;1], -1 := strong decay ; 0 := linear decay ; 1 := no decay
 twEq  = 0;      % time at which weighting takes eq weight "wEq" in [years], rel. time to ts
 twNo = 2;       % time at which weighting takes default weight "wNo" in [years], rel. time to ts
 wEq = 1;        % weight at time t_ts (=eq)
 wNo = 0;        % default weight
+
+% remove observations AFTER x years after eq [year]
+removeAfter = 2;
 
 % Additional Parameters for LSE/IRLSE
 KK = 0;             % n of iterations for IRLS
@@ -125,6 +132,7 @@ if ~exist(logFileFolder, 'dir')
 end
 
 %% Load Station Data
+
 % look in matched files
 % naming pattern for station measurement data has to be "<StationName>.mat"
 fpathpattern = fullfile(inputFolder, sprintf('%s.mat', stationName)); % match pattern
@@ -171,25 +179,43 @@ t  = t ./  (86400 * 365.25) ; % convert timestamps to [JULIAN years]
 % t  = years( seconds(t) ); % convert timestamps to [years]
 t  = t-t(1);             % adjust for negative t values
 t0 = data{1, 'date'};    % timestamp [datetime] of first measurement
+tL = data{end, 'date'};  % timestamp [datetime] of last measurement
 
 % Set up variables for relative date of jumps and transients
 % Distinguish between EQs (invokes transient) and other jumps (do not invoke transient)
 isEq = logical(currStationJumps{:, 4}); % 1:=earthquake; 0:=no earthquake
-jumps0itrf = getRelativeITRFJumps(t0, itrfChangesTextfile);
 
 % Preallocate Storages
 heavJumps  = cell(3,1); % Heaviside Jumps for the 3 coordinates E,N,U
 transients = cell(3,1); % Transients for the 3 coordinates E,N,U
+
+% Get Transient Datetime from jumps where type = eq
+ts_t = getRelativeJumps_eq(currStationJumps{:, 2}, t0, tL, isEq);
+
+% remove obs.
+isValidIdx = zeros(size( t ));
+ts_t2 = years( ts_t ) + removeAfter;
+ts_t1 = years( ts_t );
+for j = 1:length(ts_t)
+    isValidIdx( t >= ts_t1(j) &  t < ts_t2(j) ) = 1;
+end
+t(~isValidIdx) = [];
+t = t - t(1);
+data(~isValidIdx, :) = [];
+t0 = data{1, 'date'};   % Reassign
+tL = data{end, 'date'}; % Reassign
+
+ts_t = getRelativeJumps_eq(currStationJumps{:, 2}, t0, tL, isEq); % get updated transients (new t0, tL)
+
 for i = 1:3 % E-N-U
-    % Get Transient Datetime from jumps where type = eq
-    ts_t = getRelativeJumps_eq(currStationJumps{:, 2}, t0, isEq);
+    
     fprintf('[%s]: doEQjump set to "%s"\n', coordinateName{i}(1), mat2str(doEQjump(i)));
-    if doEQjump(i) 
+    if doEQjump(i)
         % all jump types
-        jumps = getRelativeJumps(currStationJumps{:, 'Date'}, t0);
+        jumps = getRelativeJumps(currStationJumps{:, 'Date'}, t0, tL);
     else
         % only jump types which are NOT eq
-        jumps = getRelativeJumps_eq(currStationJumps{:, 2}, t0, ~isEq);
+        jumps = getRelativeJumps_eq(currStationJumps{:, 2}, t0, tL, ~isEq);
     end
     
     % Add ITRF Realization Change Jumps
@@ -295,7 +321,7 @@ for i = 1:3 % E,N,U
         legend({'pivot line', 'weight controls'}, 'location', 'southoutside')
     else
         w(:,i) = deal(1);
-    end
+    end   
 end
 
 %% Grid Search: generate tau vector
@@ -752,7 +778,7 @@ for j = 1:3 % grid search-dhs-ip
         
     end
     
-    % visualize time series and results
+    % visualize time series and results 
     figTSA = figure;
     VisualizeTS_Trend_Outliers_ITRF_ENU(...
         data{:, 'date'}, [data{:, 3}, data{:, 4}, data{:, 5}], ...

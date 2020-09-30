@@ -8,7 +8,7 @@ tstring = {'East', 'North', 'Up'};
 %% 3 coordinates
 for j = 0:2
     % selection
-    data1 = data(1:3+j:end, :);
+    data1 = data(1+j:3:end, :);
     % plot
 %     figure
 %     boxplot([data1.rms15w, data1.rms15w1, data1.rms15w2 ...
@@ -16,7 +16,7 @@ for j = 0:2
 %         data1.rms2y, data1.rms2y1, data1.rms2y2 ...
 %         data1.rms, data1.rms1, data1.rms2])
     
-    figure('position',[118,556,560,245])
+    figure('position',[118,625,560,225])
     boxplot([data1.rms15w, data1.rms15w1, data1.rms15w2, ...
         data1.rms2y, data1.rms2y1, data1.rms2y2 , ...
         data1.rms, data1.rms1, data1.rms2], ...
@@ -39,19 +39,19 @@ for j = 0:2
     
 end
 
-%% statistics (bar)
-for j = 0:2
-    figure
-    data1 = data(1:3+j:end, :);
-    m15w= mean(data1{:,3:4:end});
-    m1y = mean(data1{:,4:4:end});
-    m2y = mean(data1{:,5:4:end});
-    m   = mean(data1{:,6:4:end});
-    
-    M = [m15w; m1y; m2y; m];
-    bar(M, 'BaseValue', 1.5)
-    
-end
+% %% statistics (bar)
+% for j = 0:2
+%     figure
+%     data1 = data(1:3+j:end, :);
+%     m15w= mean(data1{:,3:4:end});
+%     m1y = mean(data1{:,4:4:end});
+%     m2y = mean(data1{:,5:4:end});
+%     m   = mean(data1{:,6:4:end});
+%     
+%     M = [m15w; m1y; m2y; m];
+%     bar(M, 'BaseValue', 1.5)
+%     
+% end
 
 %% 
 function modelcomparison = importfile(filename, dataLines)

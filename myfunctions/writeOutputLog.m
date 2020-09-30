@@ -45,7 +45,7 @@ nTs = length(t_ts); % number of transients
 if ~isempty(tsTau)
     strR = '';
     for i = 1:nTs
-        strRnew = sprintf('%.1f\n', days(years( tsTau(i) )));
+        strRnew = sprintf('%.3f\n', days(years( tsTau(i) )));
         strR = [strR, strRnew];
     end
 else
