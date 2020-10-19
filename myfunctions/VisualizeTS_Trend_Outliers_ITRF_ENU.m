@@ -40,8 +40,8 @@ for i = 1:n_components
     
     % Plot Measurements
     pPts = plot(t_obs(~obs_outlier_logical{i}), obs(~obs_outlier_logical{i}, i), ...
-        '.', 'markersize', 4, ...
-        'Color', [107, 161, 250]./255);
+        '.', 'markersize', 6, ...
+        'Color', [128, 191, 255]./255);
     hold on
     % old color (darkish blue) [0, 0.4470, 0.7410]
     % Plot Trend
@@ -54,13 +54,17 @@ for i = 1:n_components
     if nnz(obs_outlier_logical{i}) > 0
         % Outlier
         pOutl = plot(t_obs(obs_outlier_logical{i}), obs(obs_outlier_logical{i}, i), ...
-            '.', 'markersize', 8, ...
+            '.', 'markersize', 7, ...
             'Color', [255, 153, 0]./255);
     end
     
     ax = gca;
     y1 = ax.YLim(1); % axis MIN
     y2 = ax.YLim(2); % axis MAX
+    
+    %small shift of xlim
+    x1 = ax.XLim(1);
+    xlim([x1-days(3) ax.XLim(2)])
     
     grid on
     hold on
@@ -108,7 +112,9 @@ for i = 1:n_components
     my_plot_legend_names = all_plot_legend_names(plotLogical);
     
     % Add Legend
-    legend(my_legend_elements, my_plot_legend_names, 'Location', 'eastoutside')
-    hold off
+    if i == 1
+        legend(my_legend_elements, my_plot_legend_names, 'Location', 'best') % changed to best from eastoutside
+        hold off
+    end
 end
 end

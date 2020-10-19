@@ -35,7 +35,7 @@ inputFolder = 'station_data_dailyXYZfiles'; % Where Station Data (TSA_ReadAndTra
 
 jumpCSVLocation = 'src/jumps-ma.csv'; % Location of Jump Table/Jump Database
 itrfChangesTextfile = 'src/itrf_changes.txt';
-doSaveResults = false; % save pngs and result files
+doSaveResults = true; % save pngs and result files
 doStaticFile = true;
 %%% Name of station to be analysed %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SELECTION FOR ANALYSIS
@@ -54,7 +54,7 @@ doStaticFile = true;
 % stationName = '21701S007A03'; % KSMV %[ok]
 % stationName = '21702M002A07'; % MIZU %[ok]
 % stationName = '21729S007A04'; % USUDA %[ok]
-stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
+% stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
 % stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
@@ -62,10 +62,10 @@ stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 
 % stationName = '41713S001A02'; % Los Angeles, Chile
 % stationName = '21762S001A01'; % Kashiwazaki [3eq ok]
-% stationName = '23114M001A01';  % Pulau Simuk, Ind
+stationName = '23114M001A01';  % Pulau Simuk, Ind
 
 %%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-polynDeg = [-1, -1, -1];% Polynomial Trend,Integer Degree, Range [-1..3]
+polynDeg = [1, 1, 1];% Polynomial Trend,Integer Degree, Range [-1..3]
 
 % periods / oscillations in YEARS (=365.25 days) in vector form
 osc = {[0.5 1], [0.5 1], [0.5 1]};     % common values: 0.5y, 1y
@@ -82,20 +82,20 @@ tarFct = 'rms';
 
 % specify type of transient: "log","exp","nil"
 transientType = {...
-    'log','exp'; ...    % coordinate1:E|X
-    'log','exp'; ...    % coordinate2:N|Y
-    'log','exp'};       % coordinate3:U|Z
+    'log','log'; ...    % coordinate1:E|X
+    'log','log'; ...    % coordinate2:N|Y
+    'log','log'};       % coordinate3:U|Z
 
 % Parameter tau in [years] for computation of logarithmic transient for
 % earthquake events (jumps):
 % vector mapping different T (tau) relaxation coefficients [years]
-tauVec1 = years(days(1:10:100));
-tauVec2 = years(days(101:25:365*3));
+tauVec1 = years(days(1:10:50));
+tauVec2 = years(days(100:25:365*1));
 % tauVec1 = years(days(1:5:365)); % full range tau
 
 % optimization constraints for transient 1 and transient 2 [years]
-lowLimit = [ 0.1/365.25, 20/365.25]; % simplex plot
-uppLimit = [19/365.25, 5000/365.25]; % simplex plot
+lowLimit = [ 1/365.25, 100/365.25]; % simplex plot
+uppLimit = [50/365.25, 5000/365.25]; % simplex plot
 
 % lowLimit = [ 0.01/365.25, 250/365.25];
 % uppLimit = [200/365.25, 8];
@@ -110,7 +110,13 @@ wEq = 1;        % weight at time t_ts (=eq)
 wNo = 0;        % default weight
 
 % remove observations AFTER x years after eq [year]
-removeAfter = 2;
+removeAfterY = inf;
+keepObs = 0;
+% removeAfterY = 2;
+
+% remove observations BEFORE Date:
+% removeBeforeDt = datetime('2011-03-11 00:00:00', 'timezone', 'utc'); % japanese eq
+removeBeforeDt = NaT;
 
 % Additional Parameters for LSE/IRLSE
 KK = 0;             % n of iterations for IRLS
@@ -174,6 +180,9 @@ VisualizeTS_ENU2(data, dataStation, NaT(1,1) ...
 oscW = cellfun(@(x) 2*pi./x, osc, 'UniformOutput', false);
 
 % Time Series Timestamps
+data(1:keepObs, :) = [];
+% data(1:keepObs:end, :) = [];
+
 t  = data{:, 't'};       % timestamps [seconds];
 t  = t ./  (86400 * 365.25) ; % convert timestamps to [JULIAN years]
 % t  = years( seconds(t) ); % convert timestamps to [years]
@@ -192,21 +201,26 @@ transients = cell(3,1); % Transients for the 3 coordinates E,N,U
 % Get Transient Datetime from jumps where type = eq
 ts_t = getRelativeJumps_eq(currStationJumps{:, 2}, t0, tL, isEq);
 
-% remove obs.
-isValidIdx = zeros(size( t ));
-ts_t2 = years( ts_t ) + removeAfter;
-ts_t1 = years( ts_t );
-for j = 1:length(ts_t)
-    isValidIdx( t >= ts_t1(j) &  t < ts_t2(j) ) = 1;
-end
-t(~isValidIdx) = [];
-t = t - t(1);
-data(~isValidIdx, :) = [];
-t0 = data{1, 'date'};   % Reassign
-tL = data{end, 'date'}; % Reassign
-
-ts_t = getRelativeJumps_eq(currStationJumps{:, 2}, t0, tL, isEq); % get updated transients (new t0, tL)
-
+%% Remove obs.
+% isValidIdx = zeros(size( t ));
+% if ~isnat(removeBeforeDt)
+%     fprintf('\n Observations removed! \n');
+%     ts_t1 = years( removeBeforeDt - t0 );
+% else
+%     ts_t1 = years( ts_t ); % set to 
+% end
+% 
+% for j = 1:length(ts_t1)
+%     isValidIdx( t >= ts_t1(j) &  t < ts_t1(j)+removeAfterY ) = 1;
+% end
+% 
+% t(~isValidIdx) = [];  % remove t
+% t = t - t(1); % recompute t
+% data(~isValidIdx, :) = []; % remove
+% t0 = data{1, 'date'};   % Reassign
+% tL = data{end, 'date'}; % Reassign
+% ts_t = getRelativeJumps_eq(currStationJumps{:, 2}, t0, tL, isEq); % get updated transients (new t0, tL)
+%%
 for i = 1:3 % E-N-U
     
     fprintf('[%s]: doEQjump set to "%s"\n', coordinateName{i}(1), mat2str(doEQjump(i)));
@@ -279,7 +293,6 @@ for i = 1:3 % E,N,U
             else
                 scale =  norm( twSta-twMid ) * ( twNo-twEq )/( wEq-wNo );
             end
-            
             
             if wFactor >= 1
                 warning('weighting: wFactor adjusted to be < 1')
@@ -388,7 +401,9 @@ switch estimationOpt
     case 1 % E-N-U
         [params, computationName] = deal( cell(3,1) );
         for i = 1:3 % E-N-U
-            params{i} = getParameterModel(KK, p, inf, t', data{:,2+i}', ...
+            params{i} = getParameterModel(KK, p, ...
+                inf, ... % (outlFactor) else the parameter space is too bumpy
+                t', data{:,2+i}', ...
                 polynDeg(i), oscW{i}, heavJumps{i}', ...
                 tsLUTgs{i}.time', tsLUTgs{i}.type', w(:,i)');
             computationName{i} = coordinateName{i};
@@ -573,12 +588,13 @@ for j = 2:3 % dhs-ip
         elseif  j == 2 && size(tauCell{i}{1},2) == 2 && length(tauVec1)>1 && length(tauVec2)>1  % 2 tau
             resultGrid = reshape(fxResAll{i}(:,1), length( tauVec2 ) , length( tauVec1 ));
             
-            if i == 1 % subplot. if not, just set up figure
-                figure; %
-                hold off % subplot
-                subplot(1,3, i) % for subplots
-            end % open only 1 figure at start
-
+%             if i == 1 % subplot. if not, just set up figure
+%                 figure; %
+%                 hold off % subplot
+%                 subplot(1,3, i) % for subplots
+%                 
+%             end
+            % open only 1 figure at start
             figure
             
             xAxisPlot = days(years( tauVec1 )); % scale xaxis to days
@@ -752,7 +768,7 @@ for j = 1:3 % grid search-dhs-ip
     
     % write matrix to csv file
     %writematrix(resultM, resultSaveFile, 'Delimiter', 'comma') % R2019a
-    if doSaveResults; csvwrite(resultSaveFile, resultM); end% R2006
+%     if doSaveResults; csvwrite(resultSaveFile, resultM); end% R2006
     
     % Visualize Results
     % set up title
@@ -770,10 +786,10 @@ for j = 1:3 % grid search-dhs-ip
 %             method);
         
         % thesis print
-        titleString{i} =  sprintf('"%s" nP:%d nJ:%d nF:%d nEq:%d ts:%s RMS=%.2f WRMS=%.2f (%s)', ...
+        titleString{i} =  sprintf('"%s" nP:%d nJ:%d nF:%d nEq:%d ts:%s RMS=%.2f (%s)', ...
             stationName, ...
             polynDeg(i), length( jumps), length( osc{i} ), nEq(i), tsStr, ...   
-            resStor{i}(j).error{1,2}, resStor{i}(j).error{2,2}, ... % rms,wrms
+            resStor{i}(j).error{1,2}, ... % rms
             method);
         
     end
@@ -792,12 +808,46 @@ for j = 1:3 % grid search-dhs-ip
         []...%readITRFChanges(itrfChangesTextfile)...
         )
     % set(gcf, 'InnerPosition', [0 0 604 513]); % small figure
-    set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
+    set(gcf, 'Units', 'centimeters', 'InnerPosition', [0 0 17 12] ); % latex thesis figure
+    set(gcf, 'Color', 'w') % latex thesis figure white
+%     set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
     
     % visualize residuals
     rsd(:,1) = data{:, 3}-resStor{1}(j).trend;
     rsd(:,2) = data{:, 4}-resStor{2}(j).trend;
     rsd(:,3) = data{:, 5}-resStor{3}(j).trend;
+    
+    rmser(1) = std(rsd(~resStor{1}(j).outl,1));
+    rmser(2) = std(rsd(~resStor{2}(j).outl,2));
+    rmser(3) = std(rsd(~resStor{3}(j).outl,3));
+    
+     for i = 1:3 % E-N-U
+        % set up plot title for residuals
+        if isempty(tauTypes{i});tsStr='-'; else; tsStr=sprintf('%s-%s', transientType{i,1},transientType{i,2}); end
+        
+        % classic
+%         titleString{i} = sprintf('Station:"%s" Transient:%s jump(itrf):%s  jump(eq):%s  RMS=%.2fmm WRMS=%.2fmm (%s)', ...
+%             stationName, tsStr,...
+%             mat2str(doITRFjump(i)), ...
+%             mat2str(doEQjump(i)), ...
+%             resStor{i}(j).error{1,2}, resStor{i}(j).error{2,2}, ... % rms,wrms
+%             method);
+        
+        % thesis print
+        titleString{i} =  sprintf('"%s" nP:%d nJ:%d nF:%d nEq:%d ts:%s RMS=%.2f (%s)', ...
+            stationName, ...
+            polynDeg(i), length( jumps), length( osc{i} ), nEq(i), tsStr, ...   
+            rmser(i), ... % rms
+            method);
+        
+    end
+    % PRINT PLOT TREND
+    if doSaveResults && j==2 % Save figure as image file (dhs only)
+        plot_title = [stationName, '-', method ,'.eps'];
+        plot_dir = 'appendix-plots';
+%         saveas(figTSA, fullfile(plot_dir, plot_title));
+        export_fig([plot_dir, '/', stationName, '-', method ,'.pdf']);
+    end
     
     figRes = figure;
     VisualizeResiduals(...
@@ -814,19 +864,14 @@ for j = 1:3 % grid search-dhs-ip
     % set(gcf, 'InnerPosition', [0 0 604 513]); % small figure
     set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
     
-    % PRINT PLOT TREND
-    if doSaveResults % Save figure as image file
-        plot_title = [stationName, '-trend.png'];
-        plot_dir = 'stationTSA_dailyXYZfiles_xyz_plots';
-        saveas(figTSA, fullfile(plot_dir, plot_title));
-    end
     
-    % PRINT PLOT RESIDUALS
-    if doSaveResults % Save figure as image file
-        plot_title = [stationName, '-residuals.png'];
-        plot_dir = 'stationTSA_dailyXYZfiles_xyz_plots';
-        saveas(figRes, fullfile(plot_dir, plot_title));
-    end
+    
+%     % PRINT PLOT RESIDUALS
+%     if doSaveResults % Save figure as image file
+%         plot_title = [stationName, '-residuals.png'];
+%         plot_dir = 'stationTSA_dailyXYZfiles_xyz_plots';
+%         saveas(figRes, fullfile(plot_dir, plot_title));
+%     end
 end
 %% End
 fprintf('Done!\n')

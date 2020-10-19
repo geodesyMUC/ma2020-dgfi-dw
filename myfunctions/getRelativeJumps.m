@@ -13,7 +13,7 @@ jumps1 = etime(datevec( repmat(tL, size(tJ,1), 1) ) , ...
 
 % remove negative values -> jumps BEFORE Time Series starts
 % remove negative values -> jumps AFTER Time Series ends
-jumps0x = jumps0(jumps0 >= -43201 & jumps1 > 0);
+jumps0x = jumps0(jumps0 >= -604800 & jumps1 > 0);
 
 % sort jumps
 jumps0x = sort(jumps0x);

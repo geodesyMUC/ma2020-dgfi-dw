@@ -39,19 +39,44 @@ for j = 0:2
     
 end
 
-% %% statistics (bar)
-% for j = 0:2
-%     figure
-%     data1 = data(1:3+j:end, :);
-%     m15w= mean(data1{:,3:4:end});
-%     m1y = mean(data1{:,4:4:end});
-%     m2y = mean(data1{:,5:4:end});
-%     m   = mean(data1{:,6:4:end});
-%     
-%     M = [m15w; m1y; m2y; m];
-%     bar(M, 'BaseValue', 1.5)
-%     
-% end
+colors = [186,190,158; ...
+216,176,192; ...
+152,193,208];
+
+
+e = data( data{:,2}==1 , : );
+n = data( data{:,2}==2 , : );
+u = data( data{:,2}==3 , : );
+
+labels = categorical;
+labels(1) = 'Kashima';
+labels(2) = 'Mizusawa';
+labels(3) = 'Usuda';
+labels(4) = 'Okushiri';
+labels(5) = 'Kashiwazaki';
+labels(6) = 'Kushiro';
+labels(7) = 'Medan';
+labels(8) = 'PulauSimuk';
+labels(9) = 'Santiago';
+labels(10) = 'LosAngeles';
+labels(11) = 'Concepcion';
+
+figure
+b=bar(labels, [ e.rms, n.rms, u.rms ], 'FaceColor','flat', 'EdgeColor','none');
+for i = 1:3
+   b(i).FaceColor = colors(i, :)./255;
+end
+
+m = mean( data.rms );
+
+hold on
+plot(xlim, [ m , m ], 'r')
+
+set(gca, 'YGrid', 'on', 'XGrid', 'off')
+ylabel('RMS [mm]')
+legend({'E','N','U'})
+
+
 
 %% 
 function modelcomparison = importfile(filename, dataLines)
