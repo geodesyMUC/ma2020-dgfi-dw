@@ -1,8 +1,14 @@
 % Time Series Analysis, Part 2A: MASTER THESIS Nov2019
 % This script reads in station coordinates for a SINGLE station,
 % calculates a trend based on the specified parameters to be estimated in a
-% Iteratively Reweighted Least Squares (IRLS) Algorithm
-% (polynome degree, oscillations, jumps, ...) and plots the result.
+% Ordinary Least Squares and Non-Linear Optimization
+% (grid search gs, downhill simplex dhs, interior point ip)
+% (Iteratively Reweighted Least Squares (IRLS) Algorithm) DEPRECATED
+%
+% Parameters for the Extended Trajectory Model comprise:
+% polynome degree, oscillations, jumps, decay functions for postseismic transient displacement
+%
+% Plots the resulting fitted values (TREND) at the end.
 %
 %   Input data for this script comprises:
 %       - Station Data created by TSA_ReadAndTransform
@@ -18,7 +24,7 @@
 %           Unknown = 0 (no unknown cause) or 1 (unknown cause)
 %           Use = 0 (dont use this jump) or 1 (use this jump)
 %
-% David Wallinger, DGFI, 5.8.2019
+% David Wallinger, DGFI
 
 clear variables;
 close all;
@@ -34,22 +40,12 @@ addpath('myfunctions')
 inputFolder = 'station_data_dailyXYZfiles'; % Where Station Data (TSA_ReadAndTransform) is stored as ".mat"
 
 jumpCSVLocation = 'src/jumps-ma.csv'; % Location of Jump Table/Jump Database
-itrfChangesTextfile = 'src/itrf_changes.txt';
-doSaveResults = true; % save pngs and result files
-doStaticFile = true;
+itrfChangesTextfile = 'src/itrf_changes.txt'; % ITRF Jumps (new ITRF release dates)
+doSaveResults = false;  % save pngs and result files (USE FALSE FOR NOW! ELSE CRASH)
+doStaticLogFile = true; % log files will keep the same name and overwrite each other
+
 %%% Name of station to be analysed %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SELECTION FOR ANALYSIS
-
-% stationName = 'MEXI'; % Mexicali, Mexico
-% stationName = 'ALAR'; % Arapiraca, Brazil
-% stationName = 'AREQ'; % Arequipa, Peru
-% stationName = 'CONZ'; % Concepcion, Chile
-% stationName = 'OAX2'; % Oaxaca, Mexico
-% stationName = 'CUEC'; % Cuenca, Ecuador
-% stationName = 'MZAE'; % Santa Rosa, Argentina (missing jump)
-% stationName = 'NEIL'; % Ciudad Neilly, Costa Rica
-% stationName = 'RWSN'; % Rawson, Argentina
-% stationName = 'PBJP';
 
 % stationName = '21701S007A03'; % KSMV %[ok]
 % stationName = '21702M002A07'; % MIZU %[ok]
@@ -59,7 +55,6 @@ doStaticFile = true;
 % stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
 % stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
 % stationName = '41719M004A02'; % Concepcion %[ok]
-
 % stationName = '41713S001A02'; % Los Angeles, Chile
 % stationName = '21762S001A01'; % Kashiwazaki [3eq ok]
 stationName = '23114M001A01';  % Pulau Simuk, Ind
@@ -68,17 +63,19 @@ stationName = '23114M001A01';  % Pulau Simuk, Ind
 polynDeg = [1, 1, 1];% Polynomial Trend,Integer Degree, Range [-1..3]
 
 % periods / oscillations in YEARS (=365.25 days) in vector form
-osc = {[0.5 1], [0.5 1], [0.5 1]};     % common values: 0.5y, 1y
-% osc = {[1], [1], [1]};     % common values: 0.5y, 1y
-% osc = {[], [], []};
+osc = {[0.5 1], [0.5 1], [0.5 1]};     % semiannual and annual signal
+% osc = {[1], [1], [1]};     % annual signal only
+% osc = {[], [], []}; % no signals
 
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
-doITRFjump  = [false false false]; % E-N-U
-doEQjump    = [true true true]; % E-N-U
-doRemoveTs = false; % global
-doTsOverlay = false; % global
-estimationOpt = 1; % 1: E-N-U , 2: E&N-U , 3: E&N&U
-tarFct = 'rms';
+doITRFjump  = [false false false];  % E-N-U
+doEQjump    = [true true true];     % E-N-U
+doRemoveTs = false;                 % global for all coordinates
+doTsOverlay = false;                % global for all coordinates
+
+% Individual fit or combined approach
+estimationOpt = 1; % 1=E-N-U , 2=E&N-U , 3=E&N&U
+tarFct = 'rms'; % default:rms
 
 % specify type of transient: "log","exp","nil"
 transientType = {...
@@ -86,42 +83,45 @@ transientType = {...
     'log','log'; ...    % coordinate2:N|Y
     'log','log'};       % coordinate3:U|Z
 
+
 % Parameter tau in [years] for computation of logarithmic transient for
 % earthquake events (jumps):
+
 % vector mapping different T (tau) relaxation coefficients [years]
 tauVec1 = years(days(1:10:50));
-tauVec2 = years(days(100:25:365*1));
-% tauVec1 = years(days(1:5:365)); % full range tau
+tauVec2 = years(days(100:25:365*2));
 
 % optimization constraints for transient 1 and transient 2 [years]
-lowLimit = [ 1/365.25, 100/365.25]; % simplex plot
+lowLimit = [ 1/365.25, 51/365.25]; % simplex plot
 uppLimit = [50/365.25, 5000/365.25]; % simplex plot
 
-% lowLimit = [ 0.01/365.25, 250/365.25];
-% uppLimit = [200/365.25, 8];
+% lowLimit = [ 0.01/365.25, 21/365.25];
+% uppLimit = [20/365.25, 8];
 
-% weighting parameters
+% weighting parameters (expert)
 doWeighting = [false false false];
-% control weight decay after eq.
-wFactor = 1;  % [-1;1], -1 := strong decay ; 0 := linear decay ; 1 := no decay
+
+% control weight decay after eq. (expert)
+wFactor = 1;    % [-1;1], -1 := strong decay ; 0 := linear decay ; 1 := no decay
 twEq  = 0;      % time at which weighting takes eq weight "wEq" in [years], rel. time to ts
 twNo = 2;       % time at which weighting takes default weight "wNo" in [years], rel. time to ts
 wEq = 1;        % weight at time t_ts (=eq)
 wNo = 0;        % default weight
 
-% remove observations AFTER x years after eq [year]
-removeAfterY = inf;
-keepObs = 0;
-% removeAfterY = 2;
+% remove observations AFTER x years after eq [year] (expert)
+removeAfterY = inf; % Remove after x years (if inf = keep everything)
+keepObsUntil = 0;   % Remove observations after this index
 
-% remove observations BEFORE Date:
-% removeBeforeDt = datetime('2011-03-11 00:00:00', 'timezone', 'utc'); % japanese eq
-removeBeforeDt = NaT;
+% remove observations BEFORE Date: (expert)
+% removeBeforeDt = datetime('2011-03-11 00:00:00', 'timezone', 'utc'); % 2011 japan eq
+removeBeforeDt = NaT; % Keep everything
 
-% Additional Parameters for LSE/IRLSE
+% Additional Parameters for LSE/IRLSE (expert)
 KK = 0;             % n of iterations for IRLS
-p = 1.0;            % L_p Norm for IRLS
-outlFactor = 5;     % median(error) + standard deviation * factor -> outlier
+p = 2.0;            % L_p Norm for IRLS
+
+% MAD(Median Absolute Deviation) outlier removal
+outlFactor = 5;     % recommended values 3,4,5 (higher->more conservative)
 
 % other variables
 coordinateName    = {'E [mm]', 'N [mm]', 'U [mm]'}; % used to label plots
@@ -180,7 +180,7 @@ VisualizeTS_ENU2(data, dataStation, NaT(1,1) ...
 oscW = cellfun(@(x) 2*pi./x, osc, 'UniformOutput', false);
 
 % Time Series Timestamps
-data(1:keepObs, :) = [];
+data(1:keepObsUntil, :) = [];
 % data(1:keepObs:end, :) = [];
 
 t  = data{:, 't'};       % timestamps [seconds];
@@ -710,7 +710,7 @@ for j = 2:3 % dhs-ip
 end
 
 %% Evaluation
-if ~doStaticFile
+if ~doStaticLogFile
     currTime = [datestr(datetime('now'),'yyyy-mm-dd_HH-MM-SS'), '.'];
 else
     currTime = '';
@@ -761,13 +761,13 @@ for j = 1:3 % grid search-dhs-ip
         '.', method, ...
         '.csv']); % output: file name of computed trends (csv)
     
-    % use custom fct
+%    % use custom fct
 %     resultM = writeResultMatrix(tInterpol, trenddata, doITRFjump, KK, p, outlFactor, ...
 %         [optParams{1}(1), optParams{2}(1), optParams{3}(1)], ...
 %         [optParams{1}(2), optParams{2}(2), optParams{3}(2)]);
-    
-    % write matrix to csv file
-    %writematrix(resultM, resultSaveFile, 'Delimiter', 'comma') % R2019a
+%    
+%    % write matrix to csv file
+%    %writematrix(resultM, resultSaveFile, 'Delimiter', 'comma') % R2019a
 %     if doSaveResults; csvwrite(resultSaveFile, resultM); end% R2006
     
     % Visualize Results
@@ -807,15 +807,16 @@ for j = 1:3 % grid search-dhs-ip
         jumpCategoryNames, ...
         []...%readITRFChanges(itrfChangesTextfile)...
         )
+    
     % set(gcf, 'InnerPosition', [0 0 604 513]); % small figure
-    set(gcf, 'Units', 'centimeters', 'InnerPosition', [0 0 17 12] ); % latex thesis figure
+%     set(gcf, 'Units', 'centimeters', 'InnerPosition', [0 0 17 12] ); % latex thesis figure
     set(gcf, 'Color', 'w') % latex thesis figure white
-%     set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
+    set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
     
     % visualize residuals
-    rsd(:,1) = data{:, 3}-resStor{1}(j).trend;
-    rsd(:,2) = data{:, 4}-resStor{2}(j).trend;
-    rsd(:,3) = data{:, 5}-resStor{3}(j).trend;
+    rsd(:,1) = data{:, 3} - resStor{1}(j).trend;
+    rsd(:,2) = data{:, 4} - resStor{2}(j).trend;
+    rsd(:,3) = data{:, 5} - resStor{3}(j).trend;
     
     rmser(1) = std(rsd(~resStor{1}(j).outl,1));
     rmser(2) = std(rsd(~resStor{2}(j).outl,2));
