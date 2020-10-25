@@ -1,19 +1,25 @@
-% Time Series Analysis, Part 2A: MASTER THESIS Nov2019
+% Time Series Analysis (TSA), Part 2
+% MASTERS THESIS Nov2019
+%
 % This script reads in station coordinates for a SINGLE station,
 % calculates a trend based on the specified parameters to be estimated in a
-% Ordinary Least Squares and Non-Linear Optimization
-% (grid search gs, downhill simplex dhs, interior point ip)
-% (Iteratively Reweighted Least Squares (IRLS) Algorithm) DEPRECATED
+% Ordinary Least Squares, using Non-Linear Optimization Methods
+% (grid search gs, downhill simplex dhs, interior point ip) to find an
+% optimum for the POST-SEISMIC DECAY FUNCTION RELAXATION TIMES.
 %
 % Parameters for the Extended Trajectory Model comprise:
 % polynome degree, oscillations, jumps, decay functions for postseismic transient displacement
 %
-% Plots the resulting fitted values (TREND) at the end.
+% Plots the resulting fitted values (called trend) at the end.
 %
 %   Input data for this script comprises:
-%       - Station Data created by TSA_ReadAndTransform
+%       - Station Data created by TSApart1_TransfStationsBLh (sirgas
+%       stations) OR TSApart1_convert_rawxyz_enu (DGFI Masters Thesis
+%       data)
+%
 %           Naming Pattern: <StationName>.mat
 %           Content: Table containing 4 columns named "t", "E", "N", "U" and associated data
+%
 %       - Jump Database ("Jump Table"):
 %           ".csv" file (";" delimiter) with 7 columns named
 %           Station = Station Code (e.g. "CONZ", "AREQ", ...)
