@@ -1,0 +1,198 @@
+## Header ================================================================================
+# Station Name
+21702M002A07
+
+# Time Series (Start;End)
+2011-03-16 12:00:00; 2015-02-14 12:00:00
+
+# Number of Measurements
+1413
+
+# LS Estimation Method (1 := E,N,U separately; 2 := E,N combined, U sep.; 3 := E,N,U comb.)
+1
+
+# Target Function for Optimization
+rms
+
+# new ITRF jump
+false; false; false
+
+# Transient Settings
+doTsOverlay: false
+doRemoveTs: false
+
+# Weighting t/f (per Coordinate)
+false; false; false
+
+# Weighting Settings (global)
+weight decay:       1.0
+weight(default):    1.0
+weight(eq):         0.0
+t_weight(eq)):      0.0
+t_weight(default)): 2.0
+
+## INPUT MODEL: Station 21702M002A07, Coordinate "E [mm]" ================================
+# Degree of Polynomial
+1
+
+# Oscillations [days; years]
+182.6; 0.50
+365.3; 1.00
+
+# Heaviside Jumps (Rel. to t0 [years];  Datetime])
+2011-03-16 00:00; -0.0014
+
+# Transients (rel. to t0 [years]; Datetime; Type of Transient)
+2011-03-16 00:00; -0.0014; log  
+2011-03-16 00:00; -0.0014; log  
+
+# Transient Range (Lower Limit [days;years] ; Upper Limit [days;years])
+1.0; 0.0027; 50.0; 0.13689
+100.0; 0.2738; 4999.9; 13.68925
+
+# IRLSE/LSE Parameters
+KK: 0
+L_p Norm: 1.0
+outl_factor: 5
+
+## RESULTS: Station 21702M002A07, Coordinate "E [mm]" -----------------------------------
+# Polynomial Coefficients
+-2.765
+5.976
+
+# Oscillation Amplitude Components (S; C; A; phase shift)
+0.376; 0.254; 0.454; 0.977
+1.039; -1.839; 2.112; -0.514
+
+# Heaviside Jump Coefficients
+-2.765
+
+# Transient Relaxation Times Tau (days)
+9.627
+458.637
+
+# Transient Amplitudes
+111.586
+348.536
+
+# Outliers (number of measurements removed)
+24
+
+# Error metrics
+rms     : 2.042
+wrms    : 2.042
+rms35d  : 2.013
+rms105d : 1.810
+rms1y   : 2.151
+rms2y   : 2.054
+
+## INPUT MODEL: Station 21702M002A07, Coordinate "N [mm]" ================================
+# Degree of Polynomial
+1
+
+# Oscillations [days; years]
+182.6; 0.50
+365.3; 1.00
+
+# Heaviside Jumps (Rel. to t0 [years];  Datetime])
+2011-03-16 00:00; -0.0014
+
+# Transients (rel. to t0 [years]; Datetime; Type of Transient)
+2011-03-16 00:00; -0.0014; log  
+2011-03-16 00:00; -0.0014; log  
+
+# Transient Range (Lower Limit [days;years] ; Upper Limit [days;years])
+1.0; 0.0027; 50.0; 0.13689
+100.0; 0.2738; 4999.9; 13.68925
+
+# IRLSE/LSE Parameters
+KK: 0
+L_p Norm: 1.0
+outl_factor: 5
+
+## RESULTS: Station 21702M002A07, Coordinate "N [mm]" -----------------------------------
+# Polynomial Coefficients
+1.895
+-34.410
+
+# Oscillation Amplitude Components (S; C; A; phase shift)
+0.256; 0.697; 0.742; 0.351
+1.154; -1.476; 1.874; -0.664
+
+# Heaviside Jump Coefficients
+1.895
+
+# Transient Relaxation Times Tau (days)
+4.990
+156.828
+
+# Transient Amplitudes
+-28.933
+-76.341
+
+# Outliers (number of measurements removed)
+20
+
+# Error metrics
+rms     : 2.639
+wrms    : 2.639
+rms35d  : 2.383
+rms105d : 2.684
+rms1y   : 2.514
+rms2y   : 2.604
+
+## INPUT MODEL: Station 21702M002A07, Coordinate "U [mm]" ================================
+# Degree of Polynomial
+1
+
+# Oscillations [days; years]
+182.6; 0.50
+365.3; 1.00
+
+# Heaviside Jumps (Rel. to t0 [years];  Datetime])
+2011-03-16 00:00; -0.0014
+
+# Transients (rel. to t0 [years]; Datetime; Type of Transient)
+2011-03-16 00:00; -0.0014; log  
+2011-03-16 00:00; -0.0014; log  
+
+# Transient Range (Lower Limit [days;years] ; Upper Limit [days;years])
+1.0; 0.0027; 50.0; 0.13689
+100.0; 0.2738; 4999.9; 13.68925
+
+# IRLSE/LSE Parameters
+KK: 0
+L_p Norm: 1.0
+outl_factor: 5
+
+## RESULTS: Station 21702M002A07, Coordinate "U [mm]" -----------------------------------
+# Polynomial Coefficients
+-5.817
+-3.190
+
+# Oscillation Amplitude Components (S; C; A; phase shift)
+-1.600; 0.043; 1.600; -1.544
+-1.344; -0.718; 1.524; 1.080
+
+# Heaviside Jump Coefficients
+-5.817
+
+# Transient Relaxation Times Tau (days)
+1.092
+1900.945
+
+# Transient Amplitudes
+-2.720
+221.861
+
+# Outliers (number of measurements removed)
+14
+
+# Error metrics
+rms     : 5.657
+wrms    : 5.657
+rms35d  : 4.897
+rms105d : 5.577
+rms1y   : 5.630
+rms2y   : 5.464
+
