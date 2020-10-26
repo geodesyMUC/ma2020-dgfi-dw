@@ -1,4 +1,4 @@
-function [y, results, xEst, outlierLogical] = computeTrendIRLS(x, b, w, polynDeg, osc, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay)
+function [y, results, xEst, outlierLogical] = OLS(x, b, w, polynDeg, osc, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay)
 % IRLSE - Iterative Reweighted (Linear) Least Squares
 % INPUT
 %   x: vector containing time stamps in [YEARS] relative to t0

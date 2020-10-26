@@ -9,7 +9,7 @@
 1143
 
 # LS Estimation Method (1 := E,N,U separately; 2 := E,N combined, U sep.; 3 := E,N,U comb.)
-2
+1
 
 # Target Function for Optimization
 rms
@@ -64,41 +64,41 @@ outl_factor: 5
 
 ## RESULTS: Station 23114M001A01, Coordinate "E [mm]" -----------------------------------
 # Polynomial Coefficients
-1.411
-30.012
+1.406
+30.024
 
 # Oscillation Amplitude Components (S; C; A; phase shift)
-0.305; -0.164; 0.347; -1.077
--0.749; 0.081; 0.754; -1.463
+0.311; -0.176; 0.358; -1.055
+-0.748; 0.081; 0.752; -1.462
 
 # Heaviside Jump Coefficients
-15.491
--65.209
-14.640
-5.921
+16.878
+-67.344
+14.750
+5.940
 
 # Transient Relaxation Times Tau (days)
-44.302
-1616.190
-2.264
-1624.118
+33.068
+1628.407
+3.328
+1382.989
 
 # Transient Amplitudes
--27.591
-416.509
--8.357
--47.913
+-23.690
+404.085
+-9.133
+-49.717
 
 # Outliers (number of measurements removed)
 11
 
 # Error metrics
-rms     : 2.225
-wrms    : 2.225
-rms35d  : 2.333
-rms105d : 2.121
-rms1y   : 2.183
-rms2y   : 2.268
+rms     : 2.194
+wrms    : 2.194
+rms35d  : 2.620
+rms105d : 2.217
+rms1y   : 2.277
+rms2y   : 2.241
 
 ## INPUT MODEL: Station 23114M001A01, Coordinate "N [mm]" ================================
 # Degree of Polynomial
@@ -133,41 +133,41 @@ outl_factor: 5
 
 ## RESULTS: Station 23114M001A01, Coordinate "N [mm]" -----------------------------------
 # Polynomial Coefficients
-2.913
-27.076
+3.007
+26.974
 
 # Oscillation Amplitude Components (S; C; A; phase shift)
--0.468; -0.272; 0.541; 1.044
--0.668; 0.833; 1.068; -0.676
+-0.499; -0.272; 0.568; 1.072
+-0.677; 0.849; 1.085; -0.673
 
 # Heaviside Jump Coefficients
-6.557
--734.179
-43.400
--3.489
+-35.614
+-931.084
+41.516
+-3.541
 
 # Transient Relaxation Times Tau (days)
-44.302
-1616.190
-2.264
-1624.118
+47.550
+215.842
+2.369
+147.212
 
 # Transient Amplitudes
--54.861
-788.992
--48.212
--14.798
+163.109
+-434.197
+-49.311
+-223.757
 
 # Outliers (number of measurements removed)
-7
+5
 
 # Error metrics
-rms     : 2.225
-wrms    : 2.225
-rms35d  : 2.333
-rms105d : 2.121
-rms1y   : 2.183
-rms2y   : 2.268
+rms     : 2.256
+wrms    : 2.256
+rms35d  : 1.693
+rms105d : 1.940
+rms1y   : 2.047
+rms2y   : 2.281
 
 ## INPUT MODEL: Station 23114M001A01, Coordinate "U [mm]" ================================
 # Degree of Polynomial

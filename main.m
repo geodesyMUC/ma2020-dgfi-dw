@@ -38,12 +38,9 @@ addpath('myfunctions')
 
 %% SETTINGS (adapt if necessary) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% INPUT data settings %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% inputFolder = 'station_data'; % Where Station Data (TSA_ReadAndTransform) is stored as ".mat"
-% jumpCSVLocation = 'src/jumps_version3.csv'; % Location of Jump Table/Jump Database
-% itrf_changes_textfile = 'src/itrf_changes.txt';
-
-% inputFolder = 'station_data_dailyXYZfiles_xyz'; % XYZ files
-inputFolder = 'station_data_dailyXYZfiles'; % Where Station Data (TSA_ReadAndTransform) is stored as ".mat"
+% inputFolder = 'data_sirgasStationsENU'; % SIRGAS station time series
+% inputFolder = 'data_psdXYZ'; % PSD stations XYZ files
+inputFolder = 'data_psdENU'; % Where Station Data (TSA_ReadAndTransform) is stored as ".mat"
 
 jumpCSVLocation = 'src/jumps-ma.csv'; % Location of Jump Table/Jump Database
 itrfChangesTextfile = 'src/itrf_changes.txt'; % ITRF Jumps (new ITRF release dates)
@@ -65,7 +62,7 @@ doStaticLogFile = true; % log files will keep the same name and overwrite each o
 % stationName = '21762S001A01'; % Kashiwazaki [3eq ok]
 stationName = '23114M001A01';  % Pulau Simuk, Ind
 
-%%% Trend Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% ETM Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 polynDeg = [1, 1, 1];% Polynomial Trend,Integer Degree, Range [-1..3]
 
 % periods / oscillations in YEARS (=365.25 days) in vector form
@@ -89,16 +86,15 @@ transientType = {...
     'log','log'; ...    % coordinate2:N|Y
     'log','log'};       % coordinate3:U|Z
 
-
 % Parameter tau in [years] for computation of logarithmic transient for
 % earthquake events (jumps):
 
 % vector mapping different T (tau) relaxation coefficients [years]
 tauVec1 = years(days(1:10:50));
-tauVec2 = years(days(100:25:365*2));
+tauVec2 = years(days(51:25:365*2));
 
 % optimization constraints for transient 1 and transient 2 [years]
-lowLimit = [ 1/365.25, 51/365.25]; % simplex plot
+lowLimit = [ 0.01/365.25, 51/365.25]; % simplex plot
 uppLimit = [50/365.25, 5000/365.25]; % simplex plot
 
 % lowLimit = [ 0.01/365.25, 21/365.25];
@@ -135,7 +131,7 @@ coordinateName    = {'E [mm]', 'N [mm]', 'U [mm]'}; % used to label plots
 jumpCategoryNames = {'Earthquake', 'SW/HW-Change', 'Unknown'}; % corresponds to jump table columns
 
 %%% Output %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-logFileFolder = 'TSA_TrendComputationResults'; % output: log file directory
+logFileFolder = 'results_logs'; % output: log file directory
 
 %% Log File
 if ~exist(logFileFolder, 'dir')
@@ -470,7 +466,7 @@ for i = 1:nComp % E-N-U, E&N-U, E&N&U
         params{i}.tau = ...
             repmat( tauCell{i}{j} , [1,nEq(i)] ); % transient parameter tau
         
-        [~, result_parameterC, ~, ~] = computeTrendIRLS( params{i}, doTsOverlay ); % LS
+        [~, result_parameterC, ~, ~] = OLS( params{i}, doTsOverlay ); % LS
         fxRes(j) = result_parameterC{ strcmp(result_parameterC(:,1), tarFct) , 2};
         fxResAll{i}(j) = result_parameterC{ strcmp(result_parameterC(:,1), tarFct) , 2};
         
@@ -485,7 +481,7 @@ for i = 1:nComp % E-N-U, E&N-U, E&N&U
     params{i}.tau = repmat( tauCell{i}{minIdx} , [1,nEq(i)] );
     params{i}.outl = outlFactor; % assign outlier factor to remove outliers
     % LS: get parameters for opt(x)
-    [~, result_parameterC, xEst, isOutlier] = computeTrendIRLS( params{i}, doTsOverlay );
+    [~, result_parameterC, xEst, isOutlier] = OLS( params{i}, doTsOverlay );
     
     for j = 1:size(xEst,1)      % loop cells returned from LS
         if iscell(xEst)
@@ -678,7 +674,7 @@ for j = 2:3 % dhs-ip
         params{i}.tau = xMin;
         params{i}.outl = outlFactor; % assign outlier factor to remove outliers
         % LS: get parameters for opt(x)
-        [~, result_parameterC, xEst, isOutlier] = computeTrendIRLS( params{i}, doTsOverlay );
+        [~, result_parameterC, xEst, isOutlier] = OLS( params{i}, doTsOverlay );
         
         for k = 1:size(xEst,1)      % loop cells returned from LS
             if iscell(xEst)
@@ -872,13 +868,12 @@ for j = 1:3 % grid search-dhs-ip
     set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
     
     
-    
-%     % PRINT PLOT RESIDUALS
-%     if doSaveResults % Save figure as image file
-%         plot_title = [stationName, '-residuals.png'];
-%         plot_dir = 'stationTSA_dailyXYZfiles_xyz_plots';
-%         saveas(figRes, fullfile(plot_dir, plot_title));
-%     end
+    % PRINT PLOT RESIDUALS
+    if doSaveResults % Save figure as image file
+        plot_title = [stationName, '-residuals.png'];
+        plot_dir = 'saved_plots';
+        saveas(figRes, fullfile(plot_dir, plot_title));
+    end
 end
 %% End
 fprintf('Done!\n')
@@ -954,7 +949,7 @@ end
 end
 
 function out = getTrendError(x, b, w, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay, tarFct)
-[~,results,~,~] = computeTrendIRLS(x, b, w, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay);
+[~,results,~,~] = OLS(x, b, w, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay);
 if isempty(strcmp(x, tarFct))
     error('getTrendError: target function "%s" for optimization was not found', tarFct);
 end
