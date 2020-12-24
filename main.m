@@ -53,14 +53,14 @@ doStaticLogFile = true; % log files will keep the same name and overwrite each o
 % stationName = '21701S007A03'; % KSMV %[ok]
 % stationName = '21702M002A07'; % MIZU %[ok]
 % stationName = '21729S007A04'; % USUDA %[ok]
-% stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
+stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
 % stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
 % stationName = '41719M004A02'; % Concepcion %[ok]
 % stationName = '41713S001A02'; % Los Angeles, Chile
 % stationName = '21762S001A01'; % Kashiwazaki [3eq ok]
-stationName = '23114M001A01';  % Pulau Simuk, Ind
+% stationName = '23114M001A01';  % Pulau Simuk, Ind
 
 %%% ETM Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 polynDeg = [1, 1, 1];% Polynomial Trend,Integer Degree, Range [-1..3]
@@ -90,11 +90,11 @@ transientType = {...
 % earthquake events (jumps):
 
 % vector mapping different T (tau) relaxation coefficients [years]
-tauVec1 = years(days(1:10:50));
+tauVec1 = years(days(1:5:50));
 tauVec2 = years(days(51:25:365*2));
 
 % optimization constraints for transient 1 and transient 2 [years]
-lowLimit = [ 0.01/365.25, 51/365.25]; % simplex plot
+lowLimit = [ 0.1/365.25, 51/365.25]; % simplex plot
 uppLimit = [50/365.25, 5000/365.25]; % simplex plot
 
 % lowLimit = [ 0.01/365.25, 21/365.25];

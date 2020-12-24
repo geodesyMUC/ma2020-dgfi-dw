@@ -2,13 +2,21 @@ clear variables;
 close all;
 % down hill simplex algorithm test
 
-load('src/output2.mat')
+% load('src/output2.mat')
+load('src/output-logexp2.mat')
 % resultGrid = -rot90(rot90(resultGrid));
-tau1 = years(days(1:10:200));
-tau2 = years(days(250:30:730));
+% tau1 = years(days(1:10:200));
+% tau2 = years(days(250:30:730));
+
+% for log exp
+tau1 = years(days(1:2:50));
+tau2 = years(days(51:5:365*2));
+
 lLim = [min(tau1), min(tau2)];
 uLim = [max(tau1), max(tau2)];
-x0 = [ min(tau1) + 0.0*(max(tau1)-min(tau1)) , min(tau2) + 0.0*(max(tau2)-min(tau2)) ];
+% x0 = [ min(tau1) + 0.2*(max(tau1)-min(tau1)) , min(tau2) + 0.2*(max(tau2)-min(tau2)) ];
+x0 = [ 0.003 , 0.55 ];
+
 steps = [max(tau1)-min(tau1), max(tau2)-min(tau2)];
 % lLim = [min(tau1)];
 % uLim = [max(tau1)];
@@ -16,7 +24,7 @@ steps = [max(tau1)-min(tau1), max(tau2)-min(tau2)];
 % steps = [max(tau1)-min(tau1)];
 restartScale = 0.001; % 
 tol = 0.0001;
-doPlot = false;
+doPlot = true;
 
 figure
 pcolor(tau1,tau2,-resultGrid);
@@ -26,39 +34,41 @@ contour(tau1,tau2,-resultGrid,'LineColor','k');
 xlim([min(tau1) , max(tau1)])
 ylim([min(tau2) , max(tau2)])
 colorbar
+xlabel('Tau short term [years]')
+ylabel('Tau long term [years]')
 hold on
 
-nIter = 10;
+nIter = 1;
 res = zeros(nIter,1);
 for i=1:nIter
     [~,fxMin,nFnCalls,nRestarts,~] = ...
-        dhsConstrainedOpt(@myInterp2, x0, steps, lLim, uLim, tol, restartScale, doPlot);
+        dhsConstrainedOpt(@myInterpLogExp, x0, steps, lLim, uLim, tol, restartScale, doPlot);
     res(i) = fxMin;
 end
 hold off
 
-figure
-histogram(res)
+% figure
+% histogram(res)
+% 
+% figure
+% pcolor(tau1,tau2,-resultGrid);
+% hold on
+% shading interp;
+% contour(tau1,tau2,-resultGrid,'LineColor','k');
+% xlim([min(tau1) , max(tau1)])
+% ylim([min(tau2) , max(tau2)])
+% colorbar
+% hold on
 
-figure
-pcolor(tau1,tau2,-resultGrid);
-hold on
-shading interp;
-contour(tau1,tau2,-resultGrid,'LineColor','k');
-xlim([min(tau1) , max(tau1)])
-ylim([min(tau2) , max(tau2)])
-colorbar
-hold on
-
-% ONeill (for comparison)
-[xMin,fxMin,nFcall,nRest,err] = nelmin(...
-    @myInterp2,...
-    2, ...
-    x0, ...
-    tol, ...
-    [max(tau1)-min(tau1), max(tau2)-min(tau2)], ...
-    2, ...
-    5000);
+% % ONeill (for comparison)
+% [xMin,fxMin,nFcall,nRest,err] = nelmin(...
+%     @myInterp2,...
+%     2, ...
+%     x0, ...
+%     tol, ...
+%     [max(tau1)-min(tau1), max(tau2)-min(tau2)], ...
+%     2, ...
+%     5000);
 
 function [xOpt, fxOpt, nF, restarts, err] = dhsConstrainedOpt(fn, xInit, L, low, upp, tol, restartScale, doPlot)
 err = '';
@@ -73,13 +83,13 @@ epsi = 0.001;       % default value for factorial test
 % restartScale = 0.1; % default value for scale of restart simplex
 nF = 0;             % number of fct calls
 
-stepScale = 1;
+stepScale = 0.1;
 p = 1/( n*sqrt(2) )*( n-1+sqrt( n+1 ) );    % initial simplex parameter 1
 q = 1/( n*sqrt(2) )*( sqrt( n+1 )-1 );      % initial simplex parameter 2
 
 if doPlot; plot(xInit(1),xInit(2),'kx'); end
 
-maxRestarts = 5;
+maxRestarts = 0;
 restarts = 0;
 % Restart Loop
 while restarts <= maxRestarts
@@ -112,6 +122,14 @@ while restarts <= maxRestarts
         nF = nF+1;
         [~,order] = sort(fX); % sort f(x) ascending
         X = X(order,:);       % adopt order
+        
+        if doPlot
+            ylim=get(gca,'ylim');
+            xlim=get(gca,'xlim');
+            theString = sprintf('RMS=%.2f',fX(1));
+            pTxt = text(xlim(1)+xlim(1)*0.1,ylim(2)-ylim(2)*0.1,...
+                theString, 'FontSize', 16);
+        end
         
         % compute centroid of all vertices except x(end)
         m = sum( X(1:end-1,:) ,1) .* 1/n;
@@ -187,6 +205,7 @@ while restarts <= maxRestarts
             pause(0.5)
             delete(pS)
             delete(pM)
+            if exist('pTxt','var');delete(pTxt);end
             if exist('pC','var');delete(pC);end
             if exist('pE','var');delete(pE);end
             if exist('pR','var');delete(pR);end

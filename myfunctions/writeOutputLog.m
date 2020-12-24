@@ -11,7 +11,7 @@ function [] = writeOutputLog(fID, station, cnName, polyn, osc, jump, t_ts, tsAmp
 fprintf(fID, '## RESULTS: Station %s, Coordinate "%s" -----------------------------------\n', station, cnName);
 
 if ~isempty(polyn)
-    strP = sprintf('%.3f\n', polyn);
+    strP = sprintf('%.2f\n', polyn);
 else
     strP = sprintf('%s\n', 'none estimated');
 end
@@ -21,7 +21,7 @@ if ~isempty(osc)
     osc = reorderSinCos( osc ); % S*cos(wt), C*sin(wt)
     strO = '';
     for i = 1:size(osc,2)
-        strONew = sprintf('%.3f; %.3f; %.3f; %.3f\n', osc(:,i), ...
+        strONew = sprintf('%.2f; %.2f; %.2f; %.2f\n', osc(:,i), ...
             sqrt(osc(1,i)^2+osc(2,i)^2), ...
             atan( osc(1,i)/osc(2,i) )  );
         strO = [strO strONew];
@@ -32,7 +32,7 @@ end
 fprintf(fID, '# Oscillation Amplitude Components (S; C; A; phase shift)\n%s\n', strO);
 
 if ~isempty(jump)
-    strJ = sprintf('%.3f\n', jump);
+    strJ = sprintf('%.2f\n', jump);
 else
     strJ = sprintf('%s\n', 'none estimated', '\n');
 end
@@ -45,7 +45,7 @@ nTs = length(t_ts); % number of transients
 if ~isempty(tsTau)
     strR = '';
     for i = 1:nTs
-        strRnew = sprintf('%.3f\n', days(years( tsTau(i) )));
+        strRnew = sprintf('%.2f\n', days(years( tsTau(i) )));
         strR = [strR, strRnew];
     end
 else
@@ -57,7 +57,7 @@ fprintf(fID, '# Transient Relaxation Times Tau (days)\n%s\n', strR);
 if ~isempty(tsAmp)
     strT = '';
     for i = 1:nTs
-        strTNew = sprintf('%.3f\n', tsAmp(i) );
+        strTNew = sprintf('%.2f\n', tsAmp(i) );
         strT = [strT, strTNew];
     end
 else

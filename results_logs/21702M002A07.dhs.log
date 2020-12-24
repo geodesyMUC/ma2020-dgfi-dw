@@ -33,166 +33,157 @@ t_weight(default)): 2.0
 
 ## INPUT MODEL: Station 21702M002A07, Coordinate "E [mm]" ================================
 # Degree of Polynomial
-1
+none estimated
 
 # Oscillations [days; years]
-182.6; 0.50
-365.3; 1.00
+none estimated
 
 # Heaviside Jumps (Rel. to t0 [years];  Datetime])
 2011-03-16 00:00; -0.0014
 
 # Transients (rel. to t0 [years]; Datetime; Type of Transient)
 2011-03-16 00:00; -0.0014; log  
-2011-03-16 00:00; -0.0014; log  
+2011-03-16 00:00; -0.0014; exp  
 
 # Transient Range (Lower Limit [days;years] ; Upper Limit [days;years])
-1.0; 0.0027; 50.0; 0.13689
-100.0; 0.2738; 4999.9; 13.68925
+0.0; 0.0000; 50.0; 0.13689
+51.0; 0.1396; 4999.9; 13.68925
 
 # IRLSE/LSE Parameters
 KK: 0
-L_p Norm: 1.0
+L_p Norm: 2.0
 outl_factor: 5
 
 ## RESULTS: Station 21702M002A07, Coordinate "E [mm]" -----------------------------------
 # Polynomial Coefficients
--3.504
-11.840
+none estimated
 
 # Oscillation Amplitude Components (S; C; A; phase shift)
-0.367; 0.234; 0.435; 1.003
-1.006; -1.800; 2.062; -0.510
+none estimated
 
 # Heaviside Jump Coefficients
--3.504
+3.060
 
 # Transient Relaxation Times Tau (days)
-8.713
-383.628
+49.999
+185.616
 
 # Transient Amplitudes
-105.558
-316.619
+-382.870
+347.846
 
 # Outliers (number of measurements removed)
-21
+8
 
 # Error metrics
-rms     : 2.063
-wrms    : 2.063
-rms35d  : 2.080
-rms105d : 1.823
-rms1y   : 2.166
-rms2y   : 2.093
+rms     : 5.050
+wrms    : 5.050
+rms35d  : 7.469
+rms105d : 6.286
+rms1y   : 5.696
+rms2y   : 5.081
 
 ## INPUT MODEL: Station 21702M002A07, Coordinate "N [mm]" ================================
 # Degree of Polynomial
-1
+none estimated
 
 # Oscillations [days; years]
-182.6; 0.50
-365.3; 1.00
+none estimated
 
 # Heaviside Jumps (Rel. to t0 [years];  Datetime])
 2011-03-16 00:00; -0.0014
 
 # Transients (rel. to t0 [years]; Datetime; Type of Transient)
 2011-03-16 00:00; -0.0014; log  
-2011-03-16 00:00; -0.0014; log  
+2011-03-16 00:00; -0.0014; exp  
 
 # Transient Range (Lower Limit [days;years] ; Upper Limit [days;years])
-1.0; 0.0027; 50.0; 0.13689
-100.0; 0.2738; 4999.9; 13.68925
+0.0; 0.0000; 50.0; 0.13689
+51.0; 0.1396; 4999.9; 13.68925
 
 # IRLSE/LSE Parameters
 KK: 0
-L_p Norm: 1.0
+L_p Norm: 2.0
 outl_factor: 5
 
 ## RESULTS: Station 21702M002A07, Coordinate "N [mm]" -----------------------------------
 # Polynomial Coefficients
-1.135
--32.155
+none estimated
 
 # Oscillation Amplitude Components (S; C; A; phase shift)
-0.252; 0.702; 0.746; 0.345
-1.134; -1.435; 1.829; -0.669
+none estimated
 
 # Heaviside Jump Coefficients
-1.135
+-21.028
 
 # Transient Relaxation Times Tau (days)
-7.137
-230.141
+33.125
+122.815
 
 # Transient Amplitudes
--35.507
--80.574
+-182.002
+104.056
 
 # Outliers (number of measurements removed)
-18
+8
 
 # Error metrics
-rms     : 2.655
-wrms    : 2.655
-rms35d  : 2.345
-rms105d : 2.923
-rms1y   : 2.589
-rms2y   : 2.644
+rms     : 3.760
+wrms    : 3.760
+rms35d  : 4.272
+rms105d : 3.788
+rms1y   : 4.129
+rms2y   : 3.932
 
 ## INPUT MODEL: Station 21702M002A07, Coordinate "U [mm]" ================================
 # Degree of Polynomial
-1
+none estimated
 
 # Oscillations [days; years]
-182.6; 0.50
-365.3; 1.00
+none estimated
 
 # Heaviside Jumps (Rel. to t0 [years];  Datetime])
 2011-03-16 00:00; -0.0014
 
 # Transients (rel. to t0 [years]; Datetime; Type of Transient)
 2011-03-16 00:00; -0.0014; log  
-2011-03-16 00:00; -0.0014; log  
+2011-03-16 00:00; -0.0014; exp  
 
 # Transient Range (Lower Limit [days;years] ; Upper Limit [days;years])
-1.0; 0.0027; 50.0; 0.13689
-100.0; 0.2738; 4999.9; 13.68925
+0.0; 0.0000; 50.0; 0.13689
+51.0; 0.1396; 4999.9; 13.68925
 
 # IRLSE/LSE Parameters
 KK: 0
-L_p Norm: 1.0
+L_p Norm: 2.0
 outl_factor: 5
 
 ## RESULTS: Station 21702M002A07, Coordinate "U [mm]" -----------------------------------
 # Polynomial Coefficients
--6.096
--39.777
+none estimated
 
 # Oscillation Amplitude Components (S; C; A; phase shift)
--1.572; 0.018; 1.572; -1.559
--1.332; -0.732; 1.520; 1.068
+none estimated
 
 # Heaviside Jump Coefficients
--6.096
+-19.712
 
 # Transient Relaxation Times Tau (days)
-1.000
-4999.897
+47.208
+214.710
 
 # Transient Amplitudes
--2.437
-1057.613
+-113.368
+98.127
 
 # Outliers (number of measurements removed)
-13
+7
 
 # Error metrics
-rms     : 5.674
-wrms    : 5.674
-rms35d  : 4.923
-rms105d : 5.587
-rms1y   : 5.636
-rms2y   : 5.466
+rms     : 4.742
+wrms    : 4.742
+rms35d  : 4.404
+rms105d : 5.202
+rms1y   : 5.015
+rms2y   : 4.741
 

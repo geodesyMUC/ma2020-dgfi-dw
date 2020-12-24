@@ -54,7 +54,9 @@ for i = 1:length(ts_t)
     if     strcmp(tsType(i),'log')
         A(:, N(4)+i  ) = log( 1 + dt./tsTau(i) ); % logarithmic transient
     elseif strcmp(tsType(i),'exp')
-        A(:, N(4)+i )  = exp( -dt./tsTau(i) );    % exponential transient
+        A(:, N(4)+i )  = 1 - exp( -dt./tsTau(i) );    % exponential
+        transient
+%         A(:, N(4)+i )  = exp( -dt./tsTau(i) );    % exponential transient opt 2
     end
 end
 end

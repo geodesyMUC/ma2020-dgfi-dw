@@ -52,9 +52,9 @@ t_weight(default)): 2.0
 2005-03-28 23:31; 2.6078; log  
 
 # Transient Range (Lower Limit [days;years] ; Upper Limit [days;years])
-1.0; 0.0027; 50.0; 0.13689
+0.0; 0.0000; 50.0; 0.13689
 51.0; 0.1396; 4999.9; 13.68925
-1.0; 0.0027; 50.0; 0.13689
+0.0; 0.0000; 50.0; 0.13689
 51.0; 0.1396; 4999.9; 13.68925
 
 # IRLSE/LSE Parameters
@@ -68,26 +68,26 @@ outl_factor: 5
 29.983
 
 # Oscillation Amplitude Components (S; C; A; phase shift)
-0.273; -0.142; 0.307; -1.090
+0.272; -0.142; 0.307; -1.090
 -0.734; 0.083; 0.739; -1.458
 
 # Heaviside Jump Coefficients
-3.833
--92.151
-9.901
+-4.600
+-92.427
+9.895
 5.683
 
 # Transient Relaxation Times Tau (days)
-1.000
-129.922
-3.275
-336.954
+0.010
+120.545
+3.288
+336.142
 
 # Transient Amplitudes
-1.677
--8.254
--10.720
--54.499
+1.786
+-8.272
+-10.741
+-54.571
 
 # Outliers (number of measurements removed)
 11
@@ -121,9 +121,9 @@ rms2y   : 2.242
 2005-03-28 23:31; 2.6078; log  
 
 # Transient Range (Lower Limit [days;years] ; Upper Limit [days;years])
-1.0; 0.0027; 50.0; 0.13689
+0.0; 0.0000; 50.0; 0.13689
 51.0; 0.1396; 4999.9; 13.68925
-1.0; 0.0027; 50.0; 0.13689
+0.0; 0.0000; 50.0; 0.13689
 51.0; 0.1396; 4999.9; 13.68925
 
 # IRLSE/LSE Parameters
@@ -141,22 +141,22 @@ outl_factor: 5
 -0.659; 0.848; 1.074; -0.661
 
 # Heaviside Jump Coefficients
--168.472
--902.562
-41.299
+-425.421
+-898.282
+41.300
 -3.554
 
 # Transient Relaxation Times Tau (days)
-1.000
+0.010
 50.999
 2.810
-135.484
+136.177
 
 # Transient Amplitudes
-61.466
--120.421
--53.169
--119.269
+58.211
+-116.296
+-53.172
+-116.012
 
 # Outliers (number of measurements removed)
 4
@@ -190,9 +190,9 @@ rms2y   : 2.266
 2005-03-28 23:31; 2.6078; log  
 
 # Transient Range (Lower Limit [days;years] ; Upper Limit [days;years])
-1.0; 0.0027; 50.0; 0.13689
+0.0; 0.0000; 50.0; 0.13689
 51.0; 0.1396; 4999.9; 13.68925
-1.0; 0.0027; 50.0; 0.13689
+0.0; 0.0000; 50.0; 0.13689
 51.0; 0.1396; 4999.9; 13.68925
 
 # IRLSE/LSE Parameters
@@ -202,39 +202,39 @@ outl_factor: 5
 
 ## RESULTS: Station 23114M001A01, Coordinate "U [mm]" -----------------------------------
 # Polynomial Coefficients
-11.516
--2.017
+11.507
+-1.989
 
 # Oscillation Amplitude Components (S; C; A; phase shift)
--0.363; 0.880; 0.952; -0.391
--2.390; -2.337; 3.343; 0.797
+-0.355; 0.813; 0.887; -0.412
+-2.364; -2.306; 3.303; 0.798
 
 # Heaviside Jump Coefficients
--6.083
-222.245
-8.227
-9.491
+-6.323
+215.905
+8.802
+9.652
 
 # Transient Relaxation Times Tau (days)
 49.999
 50.999
-1.000
+0.691
 4999.897
 
 # Transient Amplitudes
-26.759
--31.694
-21.959
--161.721
+28.991
+-33.679
+20.930
+-168.104
 
 # Outliers (number of measurements removed)
-5
+4
 
 # Error metrics
-rms     : 6.787
-wrms    : 6.787
-rms35d  : 6.524
-rms105d : 6.151
-rms1y   : 6.667
-rms2y   : 6.577
+rms     : 6.814
+wrms    : 6.814
+rms35d  : 6.574
+rms105d : 6.181
+rms1y   : 6.655
+rms2y   : 6.653
 
