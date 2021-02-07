@@ -2,7 +2,8 @@ clear variables
 close all
 addpath('myfunctions') % Add Function Storage to PATH
 
-output_folder = 'station_data_dailyXYZfiles';
+output_folder = 'data_psdENU';
+% output_folder = 'data_psdXYZ'; % when processing XYZ (uncomment "XYZ data conversion") 
 
 input_transl_file = 'src/PSD_GNSS';
 input_folder = 'raw_data/Post-seismic-deformation/Daten/GNSS/';
@@ -61,7 +62,11 @@ for i = 1:length(myFolder_content.x) % y or z can also be used
     output_table = table(d_t, t, E .* 1e3, N .* 1e3, U .* 1e3, ...
     'VariableNames', ...
         {'date', 't', 'E', 'N', 'U'});
-    
+
+    % XYZ data conversion
+    % the following code converts the XYZ time series in a format which can
+    % be read by the main function without any conversion
+    % the coordinates will be reduced by the first time series entry and converted to millimeters
 %     output_table = table(d_t, t, (x-x(1)) .* 1e3, (y-y(1)) .* 1e3, (z-z(1)) .* 1e3, ...
 %     'VariableNames', ...
 %         {'date', 't', 'X', 'Y', 'Z'});
@@ -71,11 +76,13 @@ for i = 1:length(myFolder_content.x) % y or z can also be used
     
     % save output table
     save(fullfile(output_folder, [current_station_name, '.mat']), 'currStation');
+    
     % create plot, save it
     figTS = figure('visible','off');
     VisualizeTS_ENU(currStation.Data, currStation.Station);
     saveas(figTS, fullfile(output_folder, ...
         [current_station_name, '-TSvis.png'])); % Save figure as image file
+    
     % Set CreateFcn callback
     set(figTS, 'CreateFcn', 'set(gcbo,''Visible'',''on'')');
     saveas(figTS, fullfile(output_folder, ...

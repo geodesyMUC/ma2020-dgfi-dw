@@ -1,0 +1,189 @@
+## Header ================================================================================
+# Station Name
+21702M002A07
+
+# Time Series (Start;End)
+2011-03-16 12:00:00; 2015-02-14 12:00:00
+
+# Number of Measurements
+1413
+
+# LS Estimation Method (1 := E,N,U separately; 2 := E,N combined, U sep.; 3 := E,N,U comb.)
+1
+
+# Target Function for Optimization
+rms
+
+# new ITRF jump
+false; false; false
+
+# Transient Settings
+doTsOverlay: false
+doRemoveTs: false
+
+# Weighting t/f (per Coordinate)
+false; false; false
+
+# Weighting Settings (global)
+weight decay:       1.0
+weight(default):    1.0
+weight(eq):         0.0
+t_weight(eq)):      0.0
+t_weight(default)): 2.0
+
+## INPUT MODEL: Station 21702M002A07, Coordinate "E [mm]" ================================
+# Degree of Polynomial
+none estimated
+
+# Oscillations [days; years]
+none estimated
+
+# Heaviside Jumps (Rel. to t0 [years];  Datetime])
+2011-03-16 00:00; -0.0014
+
+# Transients (rel. to t0 [years]; Datetime; Type of Transient)
+2011-03-16 00:00; -0.0014; log  
+2011-03-16 00:00; -0.0014; exp  
+
+# Transient Range (Lower Limit [days;years] ; Upper Limit [days;years])
+1.0; 0.0027; 41.0; 0.11225
+51.0; 0.1396; 726.0; 1.98772
+
+# IRLSE/LSE Parameters
+KK: 0
+L_p Norm: 2.0
+outl_factor: 5
+
+## RESULTS: Station 21702M002A07, Coordinate "E [mm]" -----------------------------------
+# Polynomial Coefficients
+none estimated
+
+# Oscillation Amplitude Components (S; C; A; phase shift)
+none estimated
+
+# Heaviside Jump Coefficients
+24.959
+
+# Transient Relaxation Times Tau (days)
+41.000
+176.000
+
+# Transient Amplitudes
+-378.085
+382.690
+
+# Outliers (number of measurements removed)
+10
+
+# Error metrics
+rms     : 5.753
+wrms    : 5.753
+rms35d  : 13.807
+rms105d : 9.941
+rms1y   : 7.630
+rms2y   : 6.282
+
+## INPUT MODEL: Station 21702M002A07, Coordinate "N [mm]" ================================
+# Degree of Polynomial
+none estimated
+
+# Oscillations [days; years]
+none estimated
+
+# Heaviside Jumps (Rel. to t0 [years];  Datetime])
+2011-03-16 00:00; -0.0014
+
+# Transients (rel. to t0 [years]; Datetime; Type of Transient)
+2011-03-16 00:00; -0.0014; log  
+2011-03-16 00:00; -0.0014; exp  
+
+# Transient Range (Lower Limit [days;years] ; Upper Limit [days;years])
+1.0; 0.0027; 41.0; 0.11225
+51.0; 0.1396; 726.0; 1.98772
+
+# IRLSE/LSE Parameters
+KK: 0
+L_p Norm: 2.0
+outl_factor: 5
+
+## RESULTS: Station 21702M002A07, Coordinate "N [mm]" -----------------------------------
+# Polynomial Coefficients
+none estimated
+
+# Oscillation Amplitude Components (S; C; A; phase shift)
+none estimated
+
+# Heaviside Jump Coefficients
+-15.732
+
+# Transient Relaxation Times Tau (days)
+31.000
+126.000
+
+# Transient Amplitudes
+-182.460
+112.087
+
+# Outliers (number of measurements removed)
+7
+
+# Error metrics
+rms     : 3.827
+wrms    : 3.827
+rms35d  : 4.517
+rms105d : 4.117
+rms1y   : 4.361
+rms2y   : 4.050
+
+## INPUT MODEL: Station 21702M002A07, Coordinate "U [mm]" ================================
+# Degree of Polynomial
+none estimated
+
+# Oscillations [days; years]
+none estimated
+
+# Heaviside Jumps (Rel. to t0 [years];  Datetime])
+2011-03-16 00:00; -0.0014
+
+# Transients (rel. to t0 [years]; Datetime; Type of Transient)
+2011-03-16 00:00; -0.0014; log  
+2011-03-16 00:00; -0.0014; exp  
+
+# Transient Range (Lower Limit [days;years] ; Upper Limit [days;years])
+1.0; 0.0027; 41.0; 0.11225
+51.0; 0.1396; 726.0; 1.98772
+
+# IRLSE/LSE Parameters
+KK: 0
+L_p Norm: 2.0
+outl_factor: 5
+
+## RESULTS: Station 21702M002A07, Coordinate "U [mm]" -----------------------------------
+# Polynomial Coefficients
+none estimated
+
+# Oscillation Amplitude Components (S; C; A; phase shift)
+none estimated
+
+# Heaviside Jump Coefficients
+-15.465
+
+# Transient Relaxation Times Tau (days)
+41.000
+201.000
+
+# Transient Amplitudes
+-111.455
+102.707
+
+# Outliers (number of measurements removed)
+6
+
+# Error metrics
+rms     : 4.781
+wrms    : 4.781
+rms35d  : 4.501
+rms105d : 5.300
+rms1y   : 5.053
+rms2y   : 4.810
+

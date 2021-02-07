@@ -40,27 +40,31 @@ for i = 1:n_components
     
     % Plot Measurements
     pPts = plot(t_obs(~obs_outlier_logical{i}), obs(~obs_outlier_logical{i}, i), ...
-        '.', 'markersize', 4, ...
-        'Color', [0, 0.4470, 0.7410]);
+        '.', 'markersize', 6, ...
+        'Color', [128, 191, 255]./255);
     hold on
-
+    % old color (darkish blue) [0, 0.4470, 0.7410]
     % Plot Trend
     pTrend = plot(t_trend, trends(:, i), 'r');
     ylabel(sprintf('%s', obs_names{i}))
     xlim([min(t_obs) max(t_obs)])
-    title(title_strings{i});
+    title(title_strings{i}, 'FontWeight','Normal');
     
     % Plot Outliers if there are any
     if nnz(obs_outlier_logical{i}) > 0
         % Outlier
         pOutl = plot(t_obs(obs_outlier_logical{i}), obs(obs_outlier_logical{i}, i), ...
-            '.', 'markersize', 8, ...
+            '.', 'markersize', 7, ...
             'Color', [255, 153, 0]./255);
     end
     
     ax = gca;
     y1 = ax.YLim(1); % axis MIN
     y2 = ax.YLim(2); % axis MAX
+    
+    %small shift of xlim
+    x1 = ax.XLim(1);
+    xlim([x1-days(3) ax.XLim(2)])
     
     grid on
     hold on
@@ -73,10 +77,12 @@ for i = 1:n_components
     end
     
     %% Set up plot legend
-    my_legend_elements = [pPts, pTrend, pITRF];    
+%     my_legend_elements = [pPts, pTrend, pITRF];
+    my_legend_elements = [pPts, pTrend]; % w/o itrf
     % Update legend Items Outliers
     plotLogical = false(4 + length(jump_categories_names), 1);
-    plotLogical(1:3) = true; % observations, trend, itrf always in plot
+    plotLogical(1:2) = true; % observations, trend,
+%     plotLogical(1:3) = true; % observations, trend, itrf always in plot
     
     if nnz(obs_outlier_logical{i}) > 0 % if outliers present, add to legend
         plotLogical(4) = true;
@@ -106,7 +112,9 @@ for i = 1:n_components
     my_plot_legend_names = all_plot_legend_names(plotLogical);
     
     % Add Legend
-    legend(my_legend_elements, my_plot_legend_names, 'Location', 'eastoutside')
-    hold off
+    if i == 1
+        legend(my_legend_elements, my_plot_legend_names, 'Location', 'best') % changed to best from eastoutside
+        hold off
+    end
 end
 end

@@ -1,8 +1,8 @@
-function Y = TimeFunction(x, pol, CS, w, jt, b, ts, a, tau, tauT)
+function y = TimeFunction(t, p, cs, w, j_t, b, ts_t, a, tsTau, tsType, doTsOverlay)
 % Creates time series from estimated parameters
-% x: timestamps [years]
-% pol: polynomial coeffiecients
-% CS: cos/sin periodic coefficients
+% t: timestamps [years]
+% polyC: polynomial coeffiecients
+% cs: cos/sin periodic coefficients
 % w: vector containing periods (rad)
 % shift
 % b: jump terms
@@ -11,65 +11,32 @@ function Y = TimeFunction(x, pol, CS, w, jt, b, ts, a, tau, tauT)
 % relaxation time T [years]
 % type of tau ("log"|"exp")
 
-if size(x, 1) > size(x, 2) % fix row/col 
-    x = x';
+if size(t, 1) > size(t, 2) % fix row/col 
+    t = t';
+end
+p = fixRowToCol(p);
+cs = fixRowToCol(cs);
+b = fixRowToCol(b);
+a = fixRowToCol(a);
+
+nPoly = length(p); % number of polynomial coeffiecients
+nW = length(w); % number of periodic coefficients
+nJump = length(j_t); % number of shifts
+nTs = length(ts_t); % number of transients
+
+if length(tsTau) ~= nTs || nTs ~= length(tsType)
+    error('Time Function:transient model mismatch: vector length of tau,tau datetime and type of tau')
 end
 
-pol_N = length(pol); % number of polynomial coeffiecients
-w_N = length(w); % number of periodic coefficients
-jump_N = length(jt); % number of shifts
-ts_N = length(ts)*length(tau); % number of transients (n_events * n_tau)
+% test
+A_ = createCoeffMat(t, nPoly-1, w, j_t, ts_t, tsTau, tsType, doTsOverlay);
+x = [p, cs, b, a];
+y = A_*x';
 
-if length(tau) ~= size(tauT,1)
-    error('length of tau vector for transients does not match length of type of tau vector')
 end
 
-yy = zeros(size(x, 2), pol_N + w_N + jump_N + ts_N);
-
-cnt = 1; % counter variable for incremenation
-% polynom terms
-for i = 0:pol_N - 1
-    yy(:, cnt) = pol(i + 1) * x.^(i);
-    cnt = cnt + 1;
+function in = fixRowToCol(in)
+if size(in, 1)>size(in, 2)
+    in = in';
 end
-
-% periodic terms
-for i = 1:w_N
-    yy(:, cnt) = CS(1, i) * cos(x * w(i)) + CS(2, i) * sin(x * w(i));
-    cnt = cnt + 1;
-end
-
-% jump terms
-for i = 1:jump_N
-    yy(:, cnt) = b(i) * heaviside(x - jt(i));
-    cnt = cnt + 1;
-end
-
-% transient terms
-% T = 1; % T = 1y -> constant
-cnp=1; % counter for eq parameters
-for i = 1:length(ts)%2:eq_N
-    dt = x - ts(i); % num coeff!=num eq events
-    dt(dt < 0) = 0; % Every observation BEFORE the eq event
-    if ~isempty(tau)
-        % compute
-        if strcmp(tauT(1,:),'log')
-            yy(:,cnt) = a(cnp) * log( 1 + dt./tau(1) ); % logarithmic transient 1
-        elseif strcmp(tauT(1,:),'exp')
-            yy(:, cnt)       = a(cnp  ) * exp( -dt./tau(1) ); % exponential 1
-        end
-        if length(tau)>1
-            if strcmp(tauT(2,:),'log')
-                yy(:, cnt+1 ) = a(cnp+1) * log( 1 + dt./tau(2) ); % logarithmic transient 2
-            elseif strcmp(tauT(2,:),'exp')
-                yy(:, cnt+1) = a(cnp+1) * exp( -dt./tau(2) ); % exponential 2
-            end
-        end
-    end
-    cnp = cnp + length(tau);
-    cnt = cnt + length(tau); % increment counter with number of Tau
-end
-
-% x(t) = term1 + term2 + ... + termCNT
-Y = sum(yy, 2); % row sum -> sum up all terms to compute y
 end
