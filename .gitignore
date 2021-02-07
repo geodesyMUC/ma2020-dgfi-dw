@@ -1,6 +1,6 @@
-/testing_only
-/saved_plots
-/results_logs
-/temp
+testing_only/
+saved_plots/
+results_logs/
+temp/
 *.asv
 *.m~
