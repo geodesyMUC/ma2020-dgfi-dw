@@ -1,7 +1,6 @@
-/stationTSA_plots
-/stationTSA_results
-/TSA_TrendComputationResults
-/stationTSA_dailyXYZfiles_plots
-/stationTSA_dailyXYZfiles_xyz_plots
+/testing_only
+/saved_plots
+/results_logs
+/temp
 *.asv
 *.m~

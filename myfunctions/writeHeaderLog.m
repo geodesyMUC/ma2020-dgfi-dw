@@ -1,4 +1,4 @@
-function [] = writeHeaderLog(fID, stationname, t0, tn, n, estOpt, tf, doitrf, doTsOverlay, doRemoveTs, doWeighting, wOpts)
+function [] = writeHeaderLog(fID, stationname, t0, tn, n, estOpt, tf, doitrf, doTsOverlay, doRemoveTs)
 
 fprintf(fID,'## Header ================================================================================\n');
 
@@ -25,18 +25,7 @@ fprintf(fID,'# new ITRF jump\n%s\n', strItrf);
 strTsopt = sprintf('doTsOverlay: %s\ndoRemoveTs: %s\n', mat2str(doTsOverlay), mat2str(doRemoveTs));
 fprintf(fID,'# Transient Settings\n%s\n', strTsopt);
 
-strW = sprintf('%s; %s; %s\n', ...
-    mat2str( doWeighting(1) ), mat2str( doWeighting(2) ), mat2str( doWeighting(3) ) );
-fprintf(fID,'# Weighting t/f (per Coordinate)\n%s\n', strW);
-
-strWg = sprintf([...
-    'weight decay:       %.1f\n', ... 
-    'weight(default):    %.1f\n', ...
-    'weight(eq):         %.1f\n', ...
-    't_weight(eq)):      %.1f\n', ...
-    't_weight(default)): %.1f\n'], ...
-    wOpts(1), wOpts(2), wOpts(3), wOpts(4), wOpts(5));
-fprintf(fID,'# Weighting Settings (global)\n%s\n', strWg);
+fprintf(fID,'# Weighting Settings (global)\n%s\n', 'No weighting applied');
 
 end
 

@@ -1,24 +1,32 @@
-% Time Series Analysis (TSA), Part 2
-% MASTERS THESIS Nov2019
+%MAIN Compute trends and estimate optimal parameters for time series with
+%     postseismic deformation
+% -------------------------------------------------------------------------
 %
 % This script reads in station coordinates for a SINGLE station,
 % calculates a trend based on the specified parameters to be estimated in a
 % Ordinary Least Squares, using Non-Linear Optimization Methods
-% (grid search gs, downhill simplex dhs, interior point ip) to find an
-% optimum for the POST-SEISMIC DECAY FUNCTION RELAXATION TIMES.
+% grid search ("gs"), downhill simplex ("dhs"), and interior point ("ip") 
+% to find an optimum for the POST-SEISMIC DECAY FUNCTION RELAXATION TIMES.
+%
+% For a better formatted documentation, check out the GitHub repo at
+% github.com/geodesyMUC/ma2020-dgfi-dw
 %
 % Parameters for the Extended Trajectory Model comprise:
-% polynome degree, oscillations, jumps, decay functions for postseismic transient displacement
+% polynome degree, oscillations, jumps, decay functions for postseismic 
+% transient displacement
 %
 % Plots the resulting fitted values (called trend) at the end.
 %
 %   Input data for this script comprises:
-%       - Station Data created by TSApart1_TransfStationsBLh (sirgas
-%       stations) OR TSApart1_convert_rawxyz_enu (DGFI Masters Thesis
-%       data)
+%       - Preprocessed Station Data mat file(s)
 %
 %           Naming Pattern: <StationName>.mat
-%           Content: Table containing 4 columns named "t", "E", "N", "U" and associated data
+%           Content: Struct "currStation"
+%               - Field "Data": Table containing 5 columns and associated data with:
+%                 date (col name must be "date", data must be datetime type),
+%                 time (relative, in seconds, col name must be "t"), 
+%                 Coordinate 1, Coordinate 2, Coordinate 3
+%               - Field "Station": <StationName> as char
 %
 %       - Jump Database ("Jump Table"):
 %           ".csv" file (";" delimiter) with 7 columns named
@@ -30,7 +38,10 @@
 %           Unknown = 0 (no unknown cause) or 1 (unknown cause)
 %           Use = 0 (dont use this jump) or 1 (use this jump)
 %
-% David Wallinger, DGFI
+% -------------------------------------------------------------------------
+% Author: David Wallinger, DGFI. david.wallinger@live.at
+% Master Thesis "Approximation of Non-Linear Post-Seismic Station 
+% Motions in the Context of Geodetic Reference Frames" (2020)
 
 clear variables;
 close all;
@@ -38,22 +49,36 @@ addpath('myfunctions')
 
 %% SETTINGS (adapt if necessary) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% INPUT data settings %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Directory where preprocessed station data is stored in ".mat" files
+
+% Input station trajectories:
+inputFolder = 'data_psd/ENU';  % PSD stations ENU coordinates
+% inputFolder = 'data_psd/XYZ';  % PSD stations ENU coordinates
+
+% Input station trajectories (TESTING, DEPRECATED, ETC):
+% inputFolder = 'data_template';
 % inputFolder = 'data_sirgasStationsENU'; % SIRGAS station time series
-% inputFolder = 'data_psdXYZ'; % PSD stations XYZ files
-inputFolder = 'data_psdENU'; % Where Station Data (TSA_ReadAndTransform) is stored as ".mat"
 
 jumpCSVLocation = 'src/jumps-ma.csv'; % Location of Jump Table/Jump Database
+jumpCategoryNames = {'Earthquake', 'SW/HW-Change', 'Unknown'}; % corresponds to jump table columns
+
 itrfChangesTextfile = 'src/itrf_changes.txt'; % ITRF Jumps (new ITRF release dates)
-doSaveResults = false;  % save pngs and result files (USE FALSE FOR NOW! ELSE CRASH)
+
+doSaveResults = true;  % save pngs and result files (USE FALSE FOR NOW! ELSE CRASH)
 doStaticLogFile = true; % log files will keep the same name and overwrite each other
+
+% Coordinate labels (Y-axis plots, ...)
+coordinateName    = {'E [mm]', 'N [mm]', 'U [mm]'};
+% coordinateName    = {'X_{red} [mm]', 'Y_{red} [mm]', 'Z_{red} [mm]'};
+
 
 %%% Name of station to be analysed %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SELECTION FOR ANALYSIS
 
 % stationName = '21701S007A03'; % KSMV %[ok]
-% stationName = '21702M002A07'; % MIZU %[ok]
+stationName = '21702M002A07'; % MIZU %[ok]
 % stationName = '21729S007A04'; % USUDA %[ok]
-stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
+% stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '21778S001A01'; % P-Kushiro - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '23104M001A01'; % Medan (North Sumatra) %[ok, 2polynDeg, 2 eqs, doeqjumps]
 % stationName = '41705M003A04'; % Santiago %[ok, doeqjumps]
@@ -62,13 +87,15 @@ stationName = '21754S001A01'; % P-Okushiri - Hokkaido %[ok, 2 eqs, doeqjumps]
 % stationName = '21762S001A01'; % Kashiwazaki [3eq ok]
 % stationName = '23114M001A01';  % Pulau Simuk, Ind
 
+% stationName = 'Teststation'; % Test stuff
+
 %%% ETM Parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 polynDeg = [1, 1, 1];% Polynomial Trend,Integer Degree, Range [-1..3]
 
 % periods / oscillations in YEARS (=365.25 days) in vector form
 osc = {[0.5 1], [0.5 1], [0.5 1]};     % semiannual and annual signal
-% osc = {[1], [1], [1]};     % annual signal only
-% osc = {[], [], []}; % no signals
+% osc = {[1], [1], [1]};                 % annual signal only
+% osc = {[], [], []};                    % no signals
 
 % Model ITRF jumps (set to "true") or ignore ITRF jumps (set to "false")
 doITRFjump  = [false false false];  % E-N-U
@@ -80,13 +107,14 @@ doTsOverlay = false;                % global for all coordinates
 estimationOpt = 1; % 1=E-N-U , 2=E&N-U , 3=E&N&U
 tarFct = 'rms'; % default:rms
 
-% specify type of transient: "log","exp","nil"
+% specify type of transient. valid values are "log","exp","nil"
+% row 1 corresponds to coordinate 1, row 2 to coordinate 2, etc.
 transientType = {...
-    'log','log'; ...    % coordinate1:E|X
-    'log','log'; ...    % coordinate2:N|Y
-    'log','log'};       % coordinate3:U|Z
+    'log','log'; ...    % coordinate1: E|X
+    'log','log'; ...    % coordinate2: N|Y
+    'log','log'};       % coordinate3: U|Z
 
-% Parameter tau in [years] for computation of logarithmic transient for
+% Parameter TAU in [years] for computation of logarithmic transient for
 % earthquake events (jumps):
 
 % vector mapping different T (tau) relaxation coefficients [years]
@@ -94,44 +122,27 @@ tauVec1 = years(days(1:5:50));
 tauVec2 = years(days(51:25:365*2));
 
 % optimization constraints for transient 1 and transient 2 [years]
-lowLimit = [ 0.1/365.25, 51/365.25]; % simplex plot
-uppLimit = [50/365.25, 5000/365.25]; % simplex plot
+lowLimit = [ 0.1/365.25, 51/365.25];
+uppLimit = [50/365.25, 5000/365.25];
 
+% Alternative bounds
 % lowLimit = [ 0.01/365.25, 21/365.25];
 % uppLimit = [20/365.25, 8];
 
-% weighting parameters (expert)
-doWeighting = [false false false];
-
-% control weight decay after eq. (expert)
-wFactor = 1;    % [-1;1], -1 := strong decay ; 0 := linear decay ; 1 := no decay
-twEq  = 0;      % time at which weighting takes eq weight "wEq" in [years], rel. time to ts
-twNo = 2;       % time at which weighting takes default weight "wNo" in [years], rel. time to ts
-wEq = 1;        % weight at time t_ts (=eq)
-wNo = 0;        % default weight
-
-% remove observations AFTER x years after eq [year] (expert)
-removeAfterY = inf; % Remove after x years (if inf = keep everything)
-keepObsUntil = 0;   % Remove observations after this index
-
-% remove observations BEFORE Date: (expert)
-% removeBeforeDt = datetime('2011-03-11 00:00:00', 'timezone', 'utc'); % 2011 japan eq
-removeBeforeDt = NaT; % Keep everything
-
-% Additional Parameters for LSE/IRLSE (expert)
-KK = 0;             % n of iterations for IRLS
-p = 2.0;            % L_p Norm for IRLS
-
-% MAD(Median Absolute Deviation) outlier removal
-outlFactor = 5;     % recommended values 3,4,5 (higher->more conservative)
-
-% other variables
-coordinateName    = {'E [mm]', 'N [mm]', 'U [mm]'}; % used to label plots
-% coordinateName    = {'X_{red} [mm]', 'Y_{red} [mm]', 'Z_{red} [mm]'}; % used to label plots
-jumpCategoryNames = {'Earthquake', 'SW/HW-Change', 'Unknown'}; % corresponds to jump table columns
+% MAD (Median Absolute Deviation) outlier removal scale factor
+outlFactor = 5;     % recommended values 3,4,5 (higher vals: more conservative)
 
 %%% Output %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 logFileFolder = 'results_logs'; % output: log file directory
+
+% Other variables
+
+%% Change with care
+% ITERATIVE LEAST SQUARES parameters, changing parameters might result in unreliabe
+% results and long computing time
+KK = 0;             % n of iterations for IRLS
+p = 2.0;            % L_p Norm for IRLS
+
 
 %% Log File
 if ~exist(logFileFolder, 'dir')
@@ -181,10 +192,6 @@ VisualizeTS_ENU2(data, dataStation, NaT(1,1) ...
 % Convert Oscillation Periods to Angular Velocity
 oscW = cellfun(@(x) 2*pi./x, osc, 'UniformOutput', false);
 
-% Time Series Timestamps
-data(1:keepObsUntil, :) = [];
-% data(1:keepObs:end, :) = [];
-
 t  = data{:, 't'};       % timestamps [seconds];
 t  = t ./  (86400 * 365.25) ; % convert timestamps to [JULIAN years]
 % t  = years( seconds(t) ); % convert timestamps to [years]
@@ -203,26 +210,7 @@ transients = cell(3,1); % Transients for the 3 coordinates E,N,U
 % Get Transient Datetime from jumps where type = eq
 ts_t = getRelativeJumps_eq(currStationJumps{:, 2}, t0, tL, isEq);
 
-%% Remove obs.
-% isValidIdx = zeros(size( t ));
-% if ~isnat(removeBeforeDt)
-%     fprintf('\n Observations removed! \n');
-%     ts_t1 = years( removeBeforeDt - t0 );
-% else
-%     ts_t1 = years( ts_t ); % set to 
-% end
-% 
-% for j = 1:length(ts_t1)
-%     isValidIdx( t >= ts_t1(j) &  t < ts_t1(j)+removeAfterY ) = 1;
-% end
-% 
-% t(~isValidIdx) = [];  % remove t
-% t = t - t(1); % recompute t
-% data(~isValidIdx, :) = []; % remove
-% t0 = data{1, 'date'};   % Reassign
-% tL = data{end, 'date'}; % Reassign
-% ts_t = getRelativeJumps_eq(currStationJumps{:, 2}, t0, tL, isEq); % get updated transients (new t0, tL)
-%%
+%% Prepare jumps
 for i = 1:3 % E-N-U
     
     fprintf('[%s]: doEQjump set to "%s"\n', coordinateName{i}(1), mat2str(doEQjump(i)));
@@ -240,11 +228,7 @@ for i = 1:3 % E-N-U
         % append itrf jumps to heaviside jumps vector
         jumps = [jumps; jumps0itrf];
     end
-    
-%     % Convert to [years] & assign to cell array 
-%     transients{i} = years( ts_t );
-%     heavJumps{i}  = years( jumps );
-    
+       
     % Convert to [JULIAN years] & assign to cell array 
     transients{i} = seconds( ts_t  ) ./  (86400 * 365.25) ;
     heavJumps{i}  = seconds( jumps ) ./  (86400 * 365.25);
@@ -257,7 +241,6 @@ end
 % create datetime array with equal date intervals (1d)
 tInterpol =  data{:, 'date'}; % take original timestamps, no interpolation
 % tInterpol =  min(data{:, 'date'}):days(1):max(data{:, 'date'}); % 1d interpolation
-dateIntvlN = length(tInterpol); % n of timestamps
 
 % preallocate output storages
 resStor = cell(1,3); % E-N-U
@@ -275,69 +258,9 @@ for i = 1:3 % E-N-U
         );
 end
 
-%% Compute LS Weights
-
-w = zeros(length(t), 3);
-% figure % debug
-for i = 1:3 % E,N,U
-    if doWeighting(i)
-        w(:,i) = wNo;
-        tTs = unique( tsLUT{i}.time );
-        
-        figure % debug
-        %         subplot(3,1,i) % debug
-        for j = 1:length( tTs ) % Loop Transients
-            twSta = [twEq; wEq];
-            twMid = [twEq + (twNo-twEq)*0.5 ; wNo + (wEq-wNo)*0.5];
-            
-            if ( wEq-wNo ) < ( twNo-twEq )
-                scale =  norm( twSta-twMid ) * ( wEq-wNo )/( twNo-twEq );
-            else
-                scale =  norm( twSta-twMid ) * ( twNo-twEq )/( wEq-wNo );
-            end
-            
-            if wFactor >= 1
-                warning('weighting: wFactor adjusted to be < 1')
-                wFactor = 1-1e-5;
-            elseif wFactor <= -1
-                warning('weighting: wFactor adjusted to be > -1')
-                wFactor = -1+1e-5;
-            end
-            % v1:
-%             V = twSta - twMid;
-%             nuV = [ V(2); -V(1) ] ./ norm( V ) * scale * wFactor;
-%             twPivot = twMid + nuV;
-            % v2:
-            V = [twNo; wEq] - twMid;
-            newV = V * wFactor;
-            twPivot = twMid + newV;
-            % ---
-            dt = t - tTs(j);
-            wLine = [...
-                twEq, twPivot(1), twNo; ...
-                wEq, twPivot(2), wNo];
-            wx = interp1(wLine(1,:), wLine(2,:), dt, 'pchip', NaN);
-            wxIdx = ~isnan(wx);
-            w( wxIdx,i ) = wx( wxIdx );
-            
-            
-            hold on % debug
-            plot([twMid(1)+tTs(j) twPivot(1)+tTs(j)],[twMid(2) twPivot(2)], 'r'); % debug
-            plot(twSta(1)+tTs(j), twSta(2), 'gx') % debug
-            plot(twMid(1)+tTs(j), twMid(2), 'gx') % debug
-            plot(twMid(1)+tTs(j), twMid(2), 'gx') % debug
-        end
-        plot(t,w(:,i),'b.') % debug
-        
-        grid on % debug
-        ylabel('weight') % debug
-        xlabel('t rel. to t_{0} [y]') % debug
-        title(sprintf('Weighting for "%s" (%s)', coordinateName{i}(1), stationName)) % debug
-        legend({'pivot line', 'weight controls'}, 'location', 'southoutside')
-    else
-        w(:,i) = deal(1);
-    end   
-end
+%% Set LS Weights
+% No weighting
+w = ones(length(t), 3);
 
 %% Grid Search: generate tau vector
 % for transients containing all combinations of values
@@ -727,15 +650,20 @@ for j = 1:3 % grid search-dhs-ip
         case 3
             method = 'ip';
     end
-    % Write to File
+    %% Write to File
     % Open Log File and get identifier
     logFile = [stationName,'.', currTime, method,'.log']; % output: log file name
     
+    % Set up folder
+    if ~exist(fullfile( logFileFolder ), 'dir')
+        mkdir(fullfile( logFileFolder ))
+    end
+    % Get file id and write header
     fID = fopen(fullfile(logFileFolder, logFile), 'wt'); % log file ID
     writeHeaderLog(fID, stationName, data{1, 'date'}, data{end, 'date'}, length(data{:, 'date'}), ...
-        estimationOpt, tarFct, doITRFjump, doTsOverlay, doRemoveTs, doWeighting, ...
-        [wFactor, wEq, wNo, twEq, twNo])
+        estimationOpt, tarFct, doITRFjump, doTsOverlay, doRemoveTs)
     
+    % Write coordinate component blocks
     for i = 1:3 % E-N-U
         writeInputLog(fID, stationName, coordinateName{i}, data{:, 'date'}, ...
             polynDeg(i), osc{i}, heavJumps{i}, ...
@@ -757,29 +685,20 @@ for j = 1:3 % grid search-dhs-ip
     fclose(fID); % close log file
     fprintf('Calculation finished.\nPlotting and writing results (%s)...\n', method)
     
-    % use parameters in file name
+    % Use parameters in file name
     resultSaveFile = fullfile(logFileFolder, [stationName, ...
         sprintf('_itrf%d_KK%d_p%.1f_outl%d', doITRFjump,KK, p, outlFactor), ...
         '.', method, ...
         '.csv']); % output: file name of computed trends (csv)
-    
-%    % use custom fct
-%     resultM = writeResultMatrix(tInterpol, trenddata, doITRFjump, KK, p, outlFactor, ...
-%         [optParams{1}(1), optParams{2}(1), optParams{3}(1)], ...
-%         [optParams{1}(2), optParams{2}(2), optParams{3}(2)]);
-%    
-%    % write matrix to csv file
-%    %writematrix(resultM, resultSaveFile, 'Delimiter', 'comma') % R2019a
-%     if doSaveResults; csvwrite(resultSaveFile, resultM); end% R2006
-    
-    % Visualize Results
-    % set up title
+        
+    %% Visualize Results
+    % Set up title
     titleString = cell(3, 1); % preallocate
     for i = 1:3 % E-N-U
         % set up plot title
         if isempty(tauTypes{i});tsStr='-'; else; tsStr=sprintf('%s-%s', transientType{i,1},transientType{i,2}); end
         
-        % classic
+        % classic style
 %         titleString{i} = sprintf('Station:"%s" Transient:%s jump(itrf):%s  jump(eq):%s  RMS=%.2fmm WRMS=%.2fmm (%s)', ...
 %             stationName, tsStr,...
 %             mat2str(doITRFjump(i)), ...
@@ -787,7 +706,7 @@ for j = 1:3 % grid search-dhs-ip
 %             resStor{i}(j).error{1,2}, resStor{i}(j).error{2,2}, ... % rms,wrms
 %             method);
         
-        % thesis print
+        % thesis style
         titleString{i} =  sprintf('"%s" nP:%d nJ:%d nF:%d nEq:%d ts:%s RMS=%.2f (%s)', ...
             stationName, ...
             polynDeg(i), length( jumps), length( osc{i} ), nEq(i), tsStr, ...   
@@ -828,7 +747,7 @@ for j = 1:3 % grid search-dhs-ip
         % set up plot title for residuals
         if isempty(tauTypes{i});tsStr='-'; else; tsStr=sprintf('%s-%s', transientType{i,1},transientType{i,2}); end
         
-        % classic
+        % classic style
 %         titleString{i} = sprintf('Station:"%s" Transient:%s jump(itrf):%s  jump(eq):%s  RMS=%.2fmm WRMS=%.2fmm (%s)', ...
 %             stationName, tsStr,...
 %             mat2str(doITRFjump(i)), ...
@@ -836,7 +755,7 @@ for j = 1:3 % grid search-dhs-ip
 %             resStor{i}(j).error{1,2}, resStor{i}(j).error{2,2}, ... % rms,wrms
 %             method);
         
-        % thesis print
+        % thesis print style
         titleString{i} =  sprintf('"%s" nP:%d nJ:%d nF:%d nEq:%d ts:%s RMS=%.2f (%s)', ...
             stationName, ...
             polynDeg(i), length( jumps), length( osc{i} ), nEq(i), tsStr, ...   
@@ -845,11 +764,17 @@ for j = 1:3 % grid search-dhs-ip
         
     end
     % PRINT PLOT TREND
-    if doSaveResults && j==2 % Save figure as image file (dhs only)
-        plot_title = [stationName, '-', method ,'.eps'];
-        plot_dir = 'appendix-plots';
-%         saveas(figTSA, fullfile(plot_dir, plot_title));
-        export_fig([plot_dir, '/', stationName, '-', method ,'.pdf']);
+    if doSaveResults && j==2 % Save figure as image file (dhs only->idx 2)
+        
+        plot_title = [stationName, '-', method ,'.png'];
+        plot_dir = 'saved_plots';
+        if ~exist(fullfile( plot_dir ), 'dir')
+            mkdir(fullfile( plot_dir ))
+        end
+        saveas(figTSA, fullfile(plot_dir, plot_title));
+        
+        % Latex print, needs custom fct
+       %  export_fig([plot_dir, '/', stationName, '-', method ,'.pdf']);
     end
     
     figRes = figure;
@@ -865,18 +790,20 @@ for j = 1:3 % grid search-dhs-ip
         readITRFChanges(itrfChangesTextfile)...
         )
     % set(gcf, 'InnerPosition', [0 0 604 513]); % small figure
-    set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure
-    
+    set(gcf, 'InnerPosition', [0 0 1000 600]); % large figure    
     
     % PRINT PLOT RESIDUALS
-    if doSaveResults % Save figure as image file
-        plot_title = [stationName, '-residuals.png'];
+    if doSaveResults && j==2 % Save figure as image file
+        plot_title = [stationName, '-', method ,'-residuals.png'];
         plot_dir = 'saved_plots';
         saveas(figRes, fullfile(plot_dir, plot_title));
     end
 end
+
 %% End
 fprintf('Done!\n')
+
+% Comment/uncomment if figures should be left open
 % close all
 
 %% Functions
@@ -915,8 +842,17 @@ res.b        = fixRowCol( b );       % vector with metric (coordinate)
 res.poly     = poly;                 % integer polynome degree
 res.o        = o;                    % periods [angular velocity]
 res.jt       = jt;                   % jump timestamps [years] relative to t0
-res.tst      = tst;                  % eq transients: time in years since t0
-res.tstype   = tstype;               % type (function) of tau (log|exp)
+
+if isempty(tst)
+    % special case with no transients
+    res.tst    = zeros( 1, 0 );      % eq transients: time in years since t0
+    res.tstype = cell( 1, 0 );       % type (function) of tau (log|exp)
+else
+    % normal case
+    res.tst    = tst;              % eq transients: time in years since t0
+    res.tstype = tstype;           % type (function) of tau (log|exp)
+end
+
 res.w        = fixRowCol( w );       % weights
 
     function out = fixRowCol(in)
@@ -929,6 +865,14 @@ res.w        = fixRowCol( w );       % weights
 end
 
 function out = getIdxParameterModel(in, idx)
+
+% To prevent index error when no transients
+if isempty( in.tst )
+    in.tst      = zeros( 1, 0 );
+    in.tstype   = cell( 1, 0 );
+end
+
+
 % INDEX: local=per coordinate, NO INDEX: global
 out.kk       = in.kk;      % n of iterations for IRLS: NO INDEX
 out.p        = in.p;       % L_p Norm for IRLS: NO INDEX
@@ -944,12 +888,26 @@ out.tst      = in.tst(idx, :);                  % eq transients: time in years s
 out.tstype   = in.tstype(idx, :);               % type (function) of tau (log|exp): INDEX
 out.w        = in.w(idx, :);                    % weights: INDEX
 if isfield( in, 'tau')
+    % To prevent index error when no transients
+    if isempty( in.tau )
+        in.tau = zeros( 1, 0 );
+    end
     out.tau      = in.tau;                          % tau: NO INDEX
 end
 end
 
 function out = getTrendError(x, b, w, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay, tarFct)
-[~,results,~,~] = OLS(x, b, w, polynDeg, W, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay);
+
+params = getParameterModel(KK, p, ...
+    outl_factor, ... % (outlFactor) else the parameter space is too bumpy
+    x, b, ...
+    polynDeg, W, j_t, ...
+    ts_t, tsType, w);
+
+params.tau = tau; % Add tau manually
+
+[~,results,~,~] = OLS( params, doTsOverlay );
+
 if isempty(strcmp(x, tarFct))
     error('getTrendError: target function "%s" for optimization was not found', tarFct);
 end

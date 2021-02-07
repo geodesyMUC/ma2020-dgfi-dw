@@ -1,12 +1,15 @@
 function [] = writeOutputLog(fID, station, cnName, polyn, osc, jump, t_ts, tsAmp, tsTau, outl, errors)
-%writeOutputLog writes output parameters to a formatted log file
+%WRITEOUTPUTLOG writes output parameters to a formatted log file
 %   fID: log file identifier
-%   ts_name: Name of Time Series
-%   xEst: estimated parameters
-%   polynDeg: integer power of polynome denoting station velocity
-%   P: vector containing periods in [YEARS]
-%   HJumps: vector containing jump times in [SECONDS] relative to t0 (if not specified -> empty)
-%   EQJump: vector containing jump times for earthquakes in [SECONDS] relative to t0 (if not specified -> empty)
+%   station: station name
+%   cnName: coordinate name
+%   polyn: polynomial coefficients
+%   osc: oscillation coefficients
+%   jump: jump coefficients
+%   t_ts: transient times
+%   tsAmp: transient amplitudes
+%   tsTau: transient relaxation times
+%   outl: outlier idx
 %   erros: key-value cell
 fprintf(fID, '## RESULTS: Station %s, Coordinate "%s" -----------------------------------\n', station, cnName);
 

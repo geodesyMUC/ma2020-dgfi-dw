@@ -1,5 +1,5 @@
 function [jumps_eq] = getRelativeJumps_eq(t, t0, tL, eq_logical)
-%getJumpsFromTable_eq creates an earthquake jump vector using seconds since time series
+%GETJUMPSFROMTABLE_EQ creates an earthquake jump vector using seconds since time series
 % start (t0)
 %   t: datetime vector with jumps for *current* station
 %   t0: datetime of first observation in time series

@@ -1,15 +1,16 @@
 function y = TimeFunction(t, p, cs, w, j_t, b, ts_t, a, tsTau, tsType, doTsOverlay)
-% Creates time series from estimated parameters
+%TIMEFUNCTION Creates time series from estimated parameters
 % t: timestamps [years]
-% polyC: polynomial coeffiecients
+% p: polynomial coeffiecients
 % cs: cos/sin periodic coefficients
 % w: vector containing periods (rad)
-% shift
+% j_t: jump times
 % b: jump terms
-% eq jump times [years]
-% amplitude of transient
-% relaxation time T [years]
-% type of tau ("log"|"exp")
+% ts_t: transient times (= eq jump times) [years]
+% a: transient amplitude
+% tsTau: transient relaxation times (tau)
+% tsType: type of tau ("log"|"exp")
+% doTsOverlay: transients overlap or not (true|false), for case when multiple earthquakes 
 
 if size(t, 1) > size(t, 2) % fix row/col 
     t = t';

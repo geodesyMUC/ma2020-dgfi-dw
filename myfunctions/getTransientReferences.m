@@ -1,5 +1,5 @@
 function [tsT] = getTransientReferences(t_ts, types, low, upp, doRemoveTs)
-%Creates Struct for Transients
+%GETTRANSIENTREFERENCES Creates Struct for Transients
 % Input:
 %   t_ts: vector with datetimes of events
 %   types: cell with either 1 x nTransient or nEq x nTransient
@@ -46,6 +46,8 @@ if ~isempty(t_ts)
     elseif size(types, 1) ~= size(upp, 1) || size(types, 1) ~= size(low, 1)
         error('getTransientReferences: input mismatch: number of constraints ~=  number of earthquakes')
     end
+else
+    return
 end
 fprintf('getTransientReferences: global tau is "%s"\n', mat2str(isGlobal)); 
 for i = 1:length(t_ts)

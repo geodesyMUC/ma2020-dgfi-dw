@@ -1,22 +1,35 @@
 function [y, results, xEst, outlierLogical] = OLS(x, b, w, polynDeg, osc, j_t, ts_t, tau, tsType, KK, p, outl_factor, doTsOverlay)
-% IRLSE - Iterative Reweighted (Linear) Least Squares
-% INPUT
+%OLS Ordinary Least Squares algorithm
+%   Computes trend, goodness of fit statistics, parameters, and outliers
+%   based on a Linear Least Squares (Ordinary Least Squares)
+% -------------------------------------------------------------------------
+% INPUT:
+%   [Basic OLS input]
 %   x: vector containing time stamps in [YEARS] relative to t0
 %   b: vector containing observations
+%   w: vector containing weights (currently not implemented, set to 1)
 %   polynDeg: integer power of polynome denoting station velocity
-%   w: vector containing periods in [RAD]
+%   osc: vector containing periods in [RAD] (Angular velocity)
 %   j_t: vector containing jump times in [YEARS] relative to t0 (if not specified -> empty)
 %   ts_t: vector containing transient times for earthquakes in [YEARS] relative to t0 (if not specified -> empty)
-%   (Note: t0 refers to the datetime of the first observation in the time series)
-%   T: Logarithmic Transient Parameter in [YEARS], will be set to 1 if not specified
+%   (Note: t0 must refer to the datetime of the first observation in the time series)
+%   tau: Transient relaxation time parameter in [YEARS]
+%   
+%   [Iterative Reweighted Least Squares paramaters] (use with care)
 %   KK: number of iterations for IRLS
 %   p: L_p Norm for IRLS. p=2 equals to the euclidean norm (=L2). 
 %   If p=2, no reweighting will be applied, independently from the number of iterations KK
+%
+%   [MAD outlier removal parameter]
 %   outl_factor: median(error)|mean(error) + standard deviation * factor -> outlier
+%
+%   [OLS style]
+%   doTsOverlay: Let transients overlap or not for multiple earthquakes (true|false)
+
 doLog = false;
 
 if nargin == 2
-    % assume input is parameter struct: reassign
+    % assume input is parameter struct: reassign variables
     doTsOverlay = b;        % overlay flag, needs to be reassigned
     b = x.b;                % 
     w = x.w;                %
@@ -46,12 +59,24 @@ if length(tau) ~= length(ts_t) || length(ts_t) ~= length(tsType)
     error('LS error:transient model: length of tau,tau datetime and type of tau vectors do not match')
 end
 
-% set up design matrix
+%% Set up design matrix A
 nCoord = size(x,1);
 nB = size(x,2);
-A = zeros( nnz(x) , sum(polynDeg)+nCoord + length(osc)*2*nCoord + numel(j_t) + numel(ts_t) );
+
+% Preallocate A
+A = zeros( nnz( ~isnan(x) ) , sum(polynDeg)+nCoord + length(osc)*2*nCoord + numel(j_t) + numel(ts_t) );
+% Storage for parameters to be estimated
 nxEst = 0;
 nxEstStor = zeros( nCoord+1 , 1);
+
+% To prevent index error when no transients
+if isempty( ts_t )
+    ts_t    = zeros( 1, 0 );
+    tsType  = cell( 1, 0 );
+end
+if isempty( tau )
+    tau     = zeros( 1, 0 );
+end
 
 for i = 1:nCoord
     j = (i-1)*nB + 1;
@@ -76,6 +101,7 @@ if w == ones(length(w),1)
     % OLS
     [xEst, e] = computeLeastSquares(A, b);
 else
+    % CURRENTLY DEPRECATED
     % WLS
     [xEst, e] = computeWeightedLeastSquares(A, b, w);
 %     xEst = lscov(A,b,w); % MATLAB method
@@ -84,14 +110,14 @@ end
 %% (2) Detect & Remove outliers
 % check if outliers are present
 
-% v1
+% version 1
 % outlierLogical = abs(e) > ( mean(e) + std(e)*outl_factor ); % Logical with outliers
 
-% v2
+% version 2
 % Logical with outliers based Median Absolute Deviation MAD
 outlierLogical = abs(e) > ( abs( median(e) ) + median( abs(e - median(e)) ) * outl_factor); 
 
-if nnz(outlierLogical) > 0
+if nnz(outlierLogical) > 0 && doLog
     fprintf('removed %s obs (MAD)\n', num2str(nnz(outlierLogical)));
 end
 % if so, then remove outliers and compute LSE one more time
@@ -120,11 +146,12 @@ rms2y = fnRms( getTimeIdx( 2, x, ts_t) );
 % jumps close to each other in time, apply the xEst parameters for jumps to
 % trend, then compute new xEst
 
-% WORK IN PROGRESS @27.1.2020 (Update 2/2020 - doesnt occur anymore)
+% WARNING: IRLS (current implementation MIGHT NOT DELIVER STABLE RESULTS, 
+% use OLS with KK=1 and p=2 for reliabe results
 
 % debugging/irls algorithm monitoring values %%%%%%%%%%%%%%%%%%%%%%
 E = [];
-RMS_vector = [rms];
+RMS_vector  = [rms ];
 WRMS_vector = [wrms];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 e(e==0) = 1e-6; % add small value to errors == 0 to prevent div by 0
@@ -186,8 +213,8 @@ results{6, 2} = rms2y;
 
 if doLog;fprintf('WMRS = %.4f, RMS = %.4f\n', wrms, rms);end
 
-y = A * xEst; % time series - trend
-xEst = xEst'; % return row
+y = A * xEst; % time series trend
+xEst = xEst'; % return row vector
 if nCoord > 1
     % preallocate
     [xEst_,  y_] = deal( cell(nCoord, 1) );
