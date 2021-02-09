@@ -1,12 +1,10 @@
 # Approximation of Non-Linear Post-Seismic Station Motions in the Context of Geodetic Reference Frames
 
-Masters Thesis: David Wallinger, DGFI. davidw01123@gmail.com
-2019/2020/2021
-
+Masters Thesis: David W., [DGFI](https://www.dgfi.tum.de/en/) & [MUAS](https://www.geo.hm.edu/), 2020
 ## About this repository
 
-This repository contains the MATLAB code and folder structure for the Masters Thesis 
-"Approximation of Non-Linear Post-Seismic Station Motions in the Context of Geodetic Reference Frames".
+This repository contains the MATLAB code, folder structure, and preprocessed files for the Masters Thesis 
+"Approximation of Non-Linear Post-Seismic Station Motions in the Context of Geodetic Reference Frames". Results are created by running the "main" script.
 
 # Instructions
 
@@ -70,10 +68,10 @@ The remaining variables such as IRLS related variables should **only** be change
 
 ## Folders
 * *data_psd* : Data input for main
-	- XYZ: Data input for main, XYZ coordinates
-	- ENU: Data input for main, ENU coordinates
-	- XYZ_plots: Raw data plots
-	- ENU_plots: Raw data plots
+	- XYZ: Data input for main, XYZ coordinates (Files already provided for existing data. If new data is to be processed, the preprocessing script needs to be run with the new data as Input)
+	- ENU: Data input for main, ENU coordinates (Files already provided for existing data. If new data is to be processed, the preprocessing script needs to be run with the new data as Input)
+	- XYZ_plots: Raw data plots (Plots already provided for existing data)
+	- ENU_plots: Raw data plots (Plots already provided for existing data)
 * *data_sirgasStationsENU* : SIRGAS stations data input for main, might need rework
 * *data_template* : Test data input for main
 * *myfunctions* : Functions used by main
